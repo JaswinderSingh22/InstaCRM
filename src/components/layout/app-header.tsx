@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -54,30 +55,36 @@ export function AppHeader({ email, name, avatarUrl }: Props) {
           </span>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuLabel className="font-normal">
-            <p className="text-xs text-muted-foreground">{email}</p>
-          </DropdownMenuLabel>
+          <DropdownMenuGroup>
+            <DropdownMenuLabel className="font-normal">
+              <p className="text-xs text-muted-foreground">{email}</p>
+            </DropdownMenuLabel>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => router.push("/settings")}>
-            <User className="mr-2 size-4" />
-            Settings
-          </DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuItem onClick={() => router.push("/settings")}>
+              <User className="mr-2 size-4" />
+              Settings
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onClick={async () => {
-              const supabase = createClient();
-              const { error } = await supabase.auth.signOut();
-              if (error) {
-                toast.error(error.message);
-                return;
-              }
-              router.push("/");
-              router.refresh();
-            }}
-          >
-            <LogOut className="mr-2 size-4" />
-            Sign out
-          </DropdownMenuItem>
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              onClick={async () => {
+                const supabase = createClient();
+                const { error } = await supabase.auth.signOut();
+                if (error) {
+                  toast.error(error.message);
+                  return;
+                }
+                router.push("/");
+                router.refresh();
+              }}
+            >
+              <LogOut className="mr-2 size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
