@@ -1,103 +1,78 @@
-import Image from "next/image";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { HeroHeading } from "@/components/marketing/hero-heading";
+import { cn } from "@/lib/utils";
+import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 
-export default function Home() {
+const features = [
+  "Leads, deals, and pipeline in one place",
+  "Brands and accounts you actually enjoy opening",
+  "Tasks with reminders and payments tracking",
+  "Templates, analytics, and Stripe billing",
+];
+
+export default async function HomePage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="relative min-h-dvh overflow-hidden bg-background">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_100%_60%_at_50%_-10%,hsl(262_55%_45%/0.18),transparent_55%)] dark:bg-[radial-gradient(ellipse_100%_60%_at_50%_-10%,hsl(262_50%_40%/0.2),transparent_55%)]" />
+      <div className="mx-auto max-w-5xl px-4 pb-20 pt-12 sm:px-6 sm:pt-20 lg:pt-24">
+        <div className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-card/50 px-3 py-1 text-xs text-muted-foreground backdrop-blur">
+          <Sparkles className="size-3" />
+          Built for teams who outgrew the spreadsheet
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        <HeroHeading>Customer relationships, designed like a product</HeroHeading>
+        <p className="mt-4 max-w-2xl text-balance text-lg text-muted-foreground">
+          InstaCRM brings Linear clarity, Notion structure, and HubSpot power into a single
+          workspace — fast, dark-mode native, and ready to ship.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          <Link
+            href="/signup"
+            className={cn(
+              buttonVariants({ size: "lg" }),
+              "rounded-md shadow-lg shadow-primary/20",
+            )}
+          >
+            Get started
+            <ArrowRight className="ml-1 size-4" />
+          </Link>
+          <Link
+            href="/login"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "lg" }),
+              "rounded-md border-border/80 bg-card/30 backdrop-blur",
+            )}
+          >
+            Sign in
+          </Link>
+        </div>
+        <ul className="mt-12 grid gap-2 sm:grid-cols-2">
+          {features.map((f) => (
+            <li
+              key={f}
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+            >
+              <span className="flex size-5 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <Check className="size-3" />
+              </span>
+              {f}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-20 text-center text-xs text-muted-foreground">
+          Next.js 15 · Supabase · Stripe · shadcn/ui
+        </p>
+      </div>
     </div>
   );
 }
