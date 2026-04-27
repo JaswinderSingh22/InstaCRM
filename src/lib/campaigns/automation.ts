@@ -68,7 +68,7 @@ async function ensureCampaignDeal(
   c: Campaign,
   actorId: string,
 ): Promise<Campaign> {
-  let cur = c;
+  const cur = c;
   if (cur.linked_deal_id) return cur;
 
   const valueCents = cur.compensation_cents ?? 0;
