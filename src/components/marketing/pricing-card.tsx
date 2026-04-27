@@ -11,6 +11,8 @@ type Props = {
   ctaText: string;
   ctaHref: string;
   isFeatured?: boolean;
+  /** When featured, shown on the ribbon (defaults to a generic label if omitted). */
+  featuredBadge?: string;
   checkColor?: "indigo" | "emerald";
 };
 
@@ -23,6 +25,7 @@ export function PricingCard({
   ctaText,
   ctaHref,
   isFeatured,
+  featuredBadge = "Most popular",
   checkColor = "emerald",
 }: Props) {
   const checkClass =
@@ -39,7 +42,7 @@ export function PricingCard({
     >
       {isFeatured ? (
         <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#4F46E5] to-[#0EA5E9] px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-white">
-          Most popular
+          {featuredBadge}
         </span>
       ) : null}
       <p

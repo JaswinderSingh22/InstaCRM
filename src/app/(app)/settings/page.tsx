@@ -45,7 +45,9 @@ export default async function SettingsPage() {
   return (
     <PageFade>
       <div className="mb-8">
-        <h1 className="font-serif text-3xl font-bold tracking-tight text-neutral-900">Account Settings</h1>
+        <h1 className="font-serif text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
+          Account Settings
+        </h1>
         <p className="mt-1 max-w-2xl text-sm text-neutral-500">
           Manage your creator profile, account preferences, and notification triggers.
         </p>

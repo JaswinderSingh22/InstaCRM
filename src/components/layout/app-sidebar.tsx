@@ -11,11 +11,21 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function AppSidebar() {
+type SidebarProps = {
+  mobileOpen: boolean;
+};
+
+export function AppSidebar({ mobileOpen }: SidebarProps) {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-60 flex-col border-r border-neutral-200/80 bg-white">
+    <aside
+      className={cn(
+        "fixed left-0 top-0 z-50 flex h-dvh w-[min(17.5rem,88vw)] flex-col border-r border-neutral-200/80 bg-white transition-transform duration-200 ease-out motion-reduce:transition-none sm:w-60",
+        "md:z-40 md:translate-x-0",
+        mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full md:translate-x-0",
+      )}
+    >
       <div className="border-b border-neutral-100 px-4 py-4">
         <p className="text-base font-bold tracking-tight text-[#4F46E5]">InstaCRM</p>
         <p className="text-[10px] font-semibold tracking-wide text-neutral-500">Creator operations</p>

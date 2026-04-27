@@ -21,7 +21,7 @@ export function DealsView({ initial }: Props) {
   };
 
   return (
-    <div className="relative min-h-[60vh]">
+    <div className="relative min-h-[60vh] pb-20 md:pb-6">
       <DealsPipelineHeader onAddDeal={() => openAdd("lead")} />
       <DealsKanban initial={initial} onAddDeal={openAdd} />
       <AddDealModal open={addOpen} onOpenChange={setAddOpen} defaultStage={addStage} />

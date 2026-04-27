@@ -173,15 +173,17 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="font-serif text-3xl font-bold tracking-tight text-neutral-900">
+        <div className="min-w-0">
+          <h1 className="font-serif text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
             Leads Management
           </h1>
           <p className="mt-1 max-w-xl text-sm text-neutral-500">
             Track and nurture your brand partnerships and high-value creator leads.
           </p>
         </div>
-        <AddLeadModal />
+        <div className="w-full shrink-0 sm:w-auto">
+          <AddLeadModal />
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -314,7 +316,7 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-sm">
+      <div className="min-w-0 overflow-hidden rounded-xl border border-neutral-200/80 bg-white shadow-sm">
         {leads.length === 0 ? (
           <div className="py-16 text-center text-sm text-neutral-500">
             <p>No leads yet.</p>
@@ -475,7 +477,7 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
               <p className="text-sm text-neutral-500">
                 Showing {showingFrom} to {showingTo} of {filtered.length} leads
               </p>
-              <div className="flex items-center gap-1">
+              <div className="flex max-w-full flex-wrap items-center justify-center gap-1 sm:justify-end">
                 <button
                   type="button"
                   disabled={safePage <= 1}

@@ -52,7 +52,7 @@ export function AddLeadModal() {
       <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="h-10 gap-2 rounded-full bg-gradient-to-r from-[#4F46E5] to-indigo-600 px-5 font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-[#4338ca] hover:to-indigo-600"
+        className="h-10 w-full gap-2 rounded-full bg-gradient-to-r from-[#4F46E5] to-indigo-600 px-5 font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-[#4338ca] hover:to-indigo-600 sm:w-auto"
       >
         <Plus className="size-4" />
         Add Lead

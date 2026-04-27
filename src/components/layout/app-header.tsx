@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ModeToggle } from "@/components/layout/mode-toggle";
-import { LogOut, MessageCircle, Search, User, Bell } from "lucide-react";
+import { LogOut, Menu, MessageCircle, Search, User, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
@@ -24,6 +24,7 @@ type Props = {
   email: string;
   name: string;
   avatarUrl: string | null;
+  onOpenMobileNav?: () => void;
 };
 
 function initials(n: string) {
@@ -33,7 +34,7 @@ function initials(n: string) {
   return (p[0]![0]! + p[1]![0]!).toUpperCase();
 }
 
-export function AppHeader({ email, name, avatarUrl }: Props) {
+export function AppHeader({ email, name, avatarUrl, onOpenMobileNav }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [q, setQ] = useState("");
@@ -54,10 +55,20 @@ export function AppHeader({ email, name, avatarUrl }: Props) {
                 : "Search leads, brands, or deals…";
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-3 border-b border-neutral-200/80 bg-white/95 px-4 backdrop-blur sm:px-6">
-      <div className="hidden min-w-0 max-w-md flex-1 md:block">
+    <header className="sticky top-0 z-30 flex h-14 items-center gap-2 border-b border-neutral-200/80 bg-white/95 px-3 backdrop-blur sm:h-16 sm:gap-3 sm:px-6">
+      {onOpenMobileNav ? (
+        <button
+          type="button"
+          className="inline-flex shrink-0 items-center justify-center rounded-lg p-2 text-neutral-700 hover:bg-neutral-100 md:hidden"
+          onClick={onOpenMobileNav}
+          aria-label="Open navigation menu"
+        >
+          <Menu className="size-5" />
+        </button>
+      ) : null}
+      <div className="min-w-0 flex-1 md:max-w-md">
         <div className="relative">
-          <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-neutral-400" />
+          <Search className="absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-neutral-400 sm:left-3" />
           <Input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -69,19 +80,23 @@ export function AppHeader({ email, name, avatarUrl }: Props) {
                   router.push(`/calendar?q=${encodeURIComponent(q.trim())}`);
                 } else if (pathname.startsWith("/payments")) {
                   router.push(`/payments?q=${encodeURIComponent(q.trim())}`);
-                } else if (pathname.startsWith("/brands")) {
+                } else                 if (pathname.startsWith("/brands")) {
                   router.push(`/brands?q=${encodeURIComponent(q.trim())}`);
+                } else if (pathname.startsWith("/billing")) {
+                  router.push(`/billing?q=${encodeURIComponent(q.trim())}`);
+                } else if (pathname.startsWith("/settings")) {
+                  router.push(`/settings?q=${encodeURIComponent(q.trim())}`);
                 } else {
                   router.push(`/leads?search=${encodeURIComponent(q.trim())}`);
                 }
               }
             }}
             placeholder={searchPlaceholder}
-            className="h-10 rounded-full border-neutral-200 bg-[#F3F4F6] pl-9 pr-3 text-sm placeholder:text-neutral-400"
+            className="h-9 rounded-full border-neutral-200 bg-[#F3F4F6] pl-8 pr-3 text-sm placeholder:text-neutral-400 sm:h-10 sm:pl-9"
           />
         </div>
       </div>
-      <div className="flex flex-1 items-center justify-end gap-1.5 sm:gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-1 sm:gap-2">
         <ModeToggle />
         <button
           type="button"

@@ -135,8 +135,8 @@ function DragHandle(props: React.HTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       type="button"
-      aria-label="Drag"
-      className="mt-0.5 grid shrink-0 grid-cols-2 gap-0.5 self-start p-0.5 text-neutral-300 hover:text-neutral-400"
+      aria-label="Drag to reorder"
+      className="mt-0.5 grid min-h-10 min-w-9 shrink-0 grid-cols-2 place-content-center gap-0.5 self-start rounded-md p-1.5 text-neutral-300 hover:bg-neutral-50 hover:text-neutral-500 active:bg-neutral-100 sm:min-h-0 sm:min-w-0 sm:p-0.5"
       {...props}
     >
       {Array.from({ length: 6 }).map((_, i) => (
@@ -163,9 +163,9 @@ function DealCard({
         isDragging && "ring-2 ring-indigo-200/70 shadow-md",
       )}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-start gap-1.5 sm:gap-2">
         {dragHandleProps ? <DragHandle {...dragHandleProps} /> : null}
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 pr-0.5">
           <div className="flex items-start justify-between gap-2">
             <h3 className="line-clamp-2 font-serif text-[15px] font-bold leading-tight text-neutral-950">
               {d.title}
@@ -278,7 +278,7 @@ export function DealsKanban({ initial, onAddDeal }: Props) {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-6 pt-1 [-ms-overflow-style:none] [scrollbar-width:thin] [&::-webkit-scrollbar]:h-2">
+      <div className="-mx-1 flex touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto scroll-pb-2 scroll-pl-3 scroll-pr-3 px-1 pb-4 pt-1 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-4 sm:scroll-pl-4 sm:scroll-pr-4 md:mx-0 md:gap-4 md:scroll-px-0 md:px-0 md:pb-6 [&::-webkit-scrollbar]:h-2">
         {STAGES.map((col) => (
           <Column key={col.id} col={col} deals={byStage[col.id]} onAddDeal={onAddDeal} />
         ))}
@@ -297,14 +297,14 @@ function Column({
   onAddDeal: (stage: DealStage) => void;
 }) {
   return (
-    <div className="flex w-[300px] shrink-0 flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-neutral-200/80 px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="flex w-[min(280px,calc(100vw-2.5rem))] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm sm:w-[min(300px,85vw)]">
+      <div className="flex items-center justify-between gap-2 border-b border-neutral-200/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+        <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
           <span
             className={cn("size-2 shrink-0 rounded-full", col.dot)}
             aria-hidden
           />
-          <h2 className="font-serif text-[13px] font-bold uppercase tracking-wide text-neutral-950">
+          <h2 className="font-serif text-[11px] font-bold uppercase tracking-wide text-neutral-950 sm:text-[13px]">
             {col.label}
           </h2>
           <span className="flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-neutral-100 px-1.5 text-[11px] font-semibold tabular-nums text-neutral-600">
@@ -334,7 +334,7 @@ function Column({
           <div
             ref={prov.innerRef}
             {...prov.droppableProps}
-            className="max-h-[min(70dvh,780px)] min-h-40 flex-1 space-y-3 overflow-y-auto p-2.5"
+            className="max-h-[min(58dvh,640px)] min-h-[11rem] flex-1 space-y-2.5 overflow-y-auto overscroll-y-contain p-2 sm:max-h-[min(70dvh,780px)] sm:min-h-40 sm:space-y-3 sm:p-2.5"
           >
             {deals.map((d, i) => (
               <Draggable key={d.id} draggableId={d.id} index={i}>

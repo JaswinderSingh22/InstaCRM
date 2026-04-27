@@ -174,7 +174,7 @@ export function AccountSettingsView({
     <Tabs value={tab} onValueChange={(v) => setTab(String(v))} className="gap-6">
       <TabsList
         variant="line"
-        className="h-auto w-full justify-start gap-8 rounded-none border-b border-neutral-200 bg-transparent p-0"
+        className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none border-b border-neutral-200 bg-transparent p-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-2"
       >
         {(
           [
@@ -187,7 +187,7 @@ export function AccountSettingsView({
           <TabsTrigger
             key={value}
             value={value}
-            className="rounded-none px-0 pb-3 text-base font-medium text-neutral-500 data-active:text-neutral-900 data-active:after:bg-[#4F46E5]"
+            className="shrink-0 rounded-none px-3 pb-3 text-sm font-medium text-neutral-500 data-active:text-neutral-900 data-active:after:bg-[#4F46E5] sm:px-4 sm:text-base"
           >
             {label}
           </TabsTrigger>
@@ -338,11 +338,11 @@ export function AccountSettingsView({
                     </select>
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 border-t border-neutral-100 pt-4">
+                <div className="flex flex-col-reverse gap-2 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
                     variant="outline"
-                    className="rounded-lg"
+                    className="w-full rounded-lg sm:w-auto"
                     onClick={cancelProfile}
                     disabled={!dirtyProfile || saving}
                   >
@@ -350,7 +350,7 @@ export function AccountSettingsView({
                   </Button>
                   <Button
                     type="button"
-                    className="rounded-lg bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white hover:from-[#4338ca] hover:to-indigo-600"
+                    className="w-full rounded-lg bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white hover:from-[#4338ca] hover:to-indigo-600 sm:w-auto"
                     onClick={() => void saveProfile()}
                     disabled={saving}
                   >

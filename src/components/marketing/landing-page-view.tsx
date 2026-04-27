@@ -13,6 +13,7 @@ import { SectionHeader } from "@/components/marketing/section-header";
 import { TestimonialCard } from "@/components/marketing/testimonial-card";
 import { StarRating } from "@/components/marketing/star-rating";
 import { cn } from "@/lib/utils";
+import { PRICING, formatPlanPrice } from "@/lib/pricing-plans";
 
 export function LandingPageView() {
   return (
@@ -121,43 +122,31 @@ export function LandingPageView() {
             />
             <div className="mt-12 grid gap-6 md:grid-cols-3 md:items-stretch">
               <PricingCard
-                planName="Starter"
-                price="$0"
-                description="Perfect for micro-creators just getting started."
-                features={[
-                  "5 Active Leads",
-                  "Basic Invoicing",
-                  "Creator Profile Page",
-                ]}
-                ctaText="Get Started"
-                ctaHref="/signup"
+                planName={PRICING.starter.name}
+                price={formatPlanPrice(PRICING.starter.monthlyPrice)}
+                description={PRICING.starter.description}
+                features={[...PRICING.starter.features]}
+                ctaText={PRICING.starter.landing.cta}
+                ctaHref={PRICING.starter.landing.href}
               />
               <PricingCard
-                planName="Pro Creator"
-                price="$29"
-                description="For serious creators running multiple deals."
-                features={[
-                  "Unlimited Leads & Deals",
-                  "Custom CRM Dashboard",
-                  "Advanced Analytics Reporting",
-                  "Priority Support",
-                ]}
-                ctaText="Go Pro Now"
-                ctaHref="/signup"
+                planName={PRICING.proCreator.name}
+                price={formatPlanPrice(PRICING.proCreator.monthlyPrice)}
+                description={PRICING.proCreator.description}
+                features={[...PRICING.proCreator.features]}
+                ctaText={PRICING.proCreator.landing.cta}
+                ctaHref={PRICING.proCreator.landing.href}
                 isFeatured
+                featuredBadge={PRICING.proCreator.badge}
                 checkColor="indigo"
               />
               <PricingCard
-                planName="Talent Agency"
-                price="$99"
-                description="Manage your entire roster of creators."
-                features={[
-                  "Up to 10 Creator Seats",
-                  "Agency-Wide Reporting",
-                  "Commission Auto-Split",
-                ]}
-                ctaText="Contact Sales"
-                ctaHref="mailto:hello@instacrm.app"
+                planName={PRICING.talentAgency.name}
+                price={formatPlanPrice(PRICING.talentAgency.monthlyPrice)}
+                description={PRICING.talentAgency.description}
+                features={[...PRICING.talentAgency.features]}
+                ctaText={PRICING.talentAgency.landing.cta}
+                ctaHref={PRICING.talentAgency.landing.href}
               />
             </div>
           </div>

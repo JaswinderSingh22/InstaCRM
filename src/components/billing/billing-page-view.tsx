@@ -7,6 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { Check, Download, Loader2, Sparkles } from "lucide-react";
+import {
+  PRICING,
+  YEARLY_BILLING_DISCOUNT,
+  yearlyMonthlyEquivalent,
+} from "@/lib/pricing-plans";
 
 type BillingTier = "free" | "pro" | "agency";
 
@@ -72,13 +77,15 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
     }
   };
 
-  const proMonthly = 29;
-  const proYearly = Math.round(proMonthly * 12 * 0.8) / 12;
-  const agencyMonthly = 99;
-  const agencyYearly = Math.round(agencyMonthly * 12 * 0.8) / 12;
-
-  const proPrice = interval === "yearly" ? proYearly : proMonthly;
-  const agencyPrice = interval === "yearly" ? agencyYearly : agencyMonthly;
+  const proPrice =
+    interval === "yearly"
+      ? yearlyMonthlyEquivalent(PRICING.proCreator.monthlyPrice)
+      : PRICING.proCreator.monthlyPrice;
+  const agencyPrice =
+    interval === "yearly"
+      ? yearlyMonthlyEquivalent(PRICING.talentAgency.monthlyPrice)
+      : PRICING.talentAgency.monthlyPrice;
+  const savePct = Math.round(YEARLY_BILLING_DISCOUNT * 100);
 
   const historyRows = [
     { date: "Oct 12, 2023", amount: "$290.00", status: "paid" as const },
@@ -89,15 +96,17 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
   return (
     <div className="mx-auto max-w-6xl space-y-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="font-serif text-3xl font-bold tracking-tight text-neutral-900">Billing & Subscriptions</h1>
+        <div className="min-w-0">
+          <h1 className="font-serif text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">
+            Billing & Subscriptions
+          </h1>
           <p className="mt-1 text-sm text-neutral-500">
             Manage your plan, invoices, and payment methods in one place.
           </p>
         </div>
         <Button
           type="button"
-          className="shrink-0 rounded-xl bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white shadow-md hover:from-[#4338ca] hover:to-indigo-600"
+          className="h-10 w-full shrink-0 rounded-xl bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white shadow-md hover:from-[#4338ca] hover:to-indigo-600 sm:h-9 sm:w-auto"
           onClick={() => void openPortal()}
           disabled={load !== null}
         >
@@ -168,18 +177,18 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
             </div>
             {interval === "yearly" ? (
               <span className="inline-flex w-fit items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
-                Save 20%
+                Save {savePct}%
               </span>
             ) : null}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <PlanCard
-              name="Free"
-              description="Get started with core CRM tools."
+              name={PRICING.starter.name}
+              description={PRICING.starter.description}
               price={0}
               interval={interval}
-              features={["Up to 10 leads", "5 active deals", "Basic templates", "Email support"]}
+              features={[...PRICING.starter.features]}
               cta={
                 tier === "free" ? (
                   <Button variant="outline" className="w-full rounded-xl" disabled>
@@ -194,17 +203,12 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
               highlighted={false}
             />
             <PlanCard
-              name="Pro"
-              description="Everything you need to scale partnerships."
+              name={PRICING.proCreator.name}
+              description={PRICING.proCreator.description}
               price={proPrice}
               interval={interval}
-              badge="Most popular"
-              features={[
-                "Unlimited leads & deals",
-                "Advanced analytics",
-                "Custom templates",
-                "Priority support",
-              ]}
+              badge={PRICING.proCreator.badge}
+              features={[...PRICING.proCreator.features]}
               cta={
                 tier === "pro" ? (
                   <Button
@@ -220,35 +224,32 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
                     onClick={() => void openCheckout()}
                     disabled={load !== null}
                   >
-                    {load === "checkout" ? <Loader2 className="size-4 animate-spin" /> : "Upgrade to Pro"}
+                    {load === "checkout" ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      `Upgrade to ${PRICING.proCreator.name}`
+                    )}
                   </Button>
                 )
               }
               highlighted
             />
             <PlanCard
-              name="Agency"
-              description="For teams managing multiple creators."
+              name={PRICING.talentAgency.name}
+              description={PRICING.talentAgency.description}
               price={agencyPrice}
               interval={interval}
-              features={[
-                "Up to 10 team seats",
-                "Multi-creator management",
-                "Agency-wide reporting",
-                "Dedicated success manager",
-              ]}
+              features={[...PRICING.talentAgency.features]}
               cta={
-                <Button
-                  variant="outline"
-                  className="w-full rounded-xl border-[#4F46E5] text-[#4F46E5] hover:bg-indigo-50"
-                  onClick={() =>
-                    toast.message("Agency plan", {
-                      description: "Contact sales to enable multi-seat billing for your workspace.",
-                    })
-                  }
+                <Link
+                  href={PRICING.talentAgency.landing.href}
+                  className={cn(
+                    buttonVariants({ variant: "outline" }),
+                    "w-full rounded-xl border-[#4F46E5] text-[#4F46E5] hover:bg-indigo-50",
+                  )}
                 >
-                  Upgrade to Agency
-                </Button>
+                  {PRICING.talentAgency.landing.cta}
+                </Link>
               }
               highlighted={false}
             />
@@ -355,13 +356,13 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
               </p>
             </div>
             <Link
-              href="mailto:sales@instacrm.io?subject=Custom%20plan%20inquiry"
+              href={`${PRICING.talentAgency.landing.href}?subject=${encodeURIComponent("Custom plan inquiry")}`}
               className={cn(
                 buttonVariants({ variant: "secondary" }),
                 "mt-6 w-fit rounded-xl border-0 bg-white font-semibold text-neutral-900 hover:bg-neutral-100",
               )}
             >
-              Contact sales
+              {PRICING.talentAgency.landing.cta}
             </Link>
           </div>
         </section>
