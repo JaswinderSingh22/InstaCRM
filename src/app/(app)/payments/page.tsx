@@ -27,7 +27,7 @@ function FinanceLoading() {
 export default async function PaymentsPage({ searchParams }: Props) {
   const p = await searchParams;
   const initialQuery = typeof p.q === "string" ? p.q : "";
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, profile } = await requireWorkspace();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("payments")
@@ -41,7 +41,11 @@ export default async function PaymentsPage({ searchParams }: Props) {
 
   return (
     <Suspense fallback={<FinanceLoading />}>
-      <PaymentsFinanceView rows={rows} initialQuery={initialQuery} />
+      <PaymentsFinanceView
+        rows={rows}
+        initialQuery={initialQuery}
+        workspaceDefaultCurrency={profile.workspace_default_currency}
+      />
     </Suspense>
   );
 }

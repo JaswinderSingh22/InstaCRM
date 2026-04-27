@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { WORKSPACE_CURRENCY_OPTIONS } from "@/lib/currency";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import { ONBOARDING_STEPS, type FollowerTier, type OnboardingAnswers } from "@/lib/types/onboarding";
 
 const TIERS: {
@@ -85,6 +87,7 @@ export function OnboardingWizard({ initial, profileName }: Props) {
     followerCount: initial.followerCount,
     niche: initial.niche ?? "",
     monetization: initial.monetization ?? "",
+    preferredCurrency: normalizeWorkspaceCurrency(initial.preferredCurrency),
     growthGoals: initial.growthGoals ?? "",
   });
 
@@ -185,7 +188,7 @@ export function OnboardingWizard({ initial, profileName }: Props) {
               );
             })}
           </ol>
-          <div className="mt-8 hidden overflow-hidden rounded-2xl bg-neutral-900 p-4 text-white shadow-lg lg:block">
+          {/* <div className="mt-8 hidden overflow-hidden rounded-2xl bg-neutral-900 p-4 text-white shadow-lg lg:block">
             <div className="relative mb-3 aspect-square w-16 overflow-hidden rounded-full ring-2 ring-white/20">
               <Image
                 src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=128&h=128&fit=crop"
@@ -199,7 +202,7 @@ export function OnboardingWizard({ initial, profileName }: Props) {
               &ldquo;InstaCRM helped me scale from 10k to 50k followers in 3 months.&rdquo;
             </p>
             <p className="mt-2 text-xs text-white/60">— @AlexCreator</p>
-          </div>
+          </div> */}
         </aside>
 
         <div className="min-w-0 flex-1">
@@ -225,6 +228,9 @@ export function OnboardingWizard({ initial, profileName }: Props) {
               <StepMonetization a={a} onChange={setField} />
             )}
             {step === 5 && (
+              <StepCurrency a={a} onChange={setField} />
+            )}
+            {step === 6 && (
               <StepGoals a={a} onChange={setField} />
             )}
 
@@ -468,6 +474,49 @@ function StepMonetization({
               )}
             >
               {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function StepCurrency({
+  a,
+  onChange,
+}: {
+  a: OnboardingAnswers;
+  onChange: <K extends keyof OnboardingAnswers>(k: K, v: OnboardingAnswers[K]) => void;
+}) {
+  const selected = normalizeWorkspaceCurrency(a.preferredCurrency);
+  return (
+    <div>
+      <h1 className="text-2xl font-bold tracking-tight text-neutral-900 sm:text-3xl">Preferred currency</h1>
+      <p className="mt-2 text-sm text-[#777681]">
+        We&apos;ll show deal, campaign, and payment amounts in this currency across your workspace.{" "}
+        <span className="font-medium text-neutral-700">Subscription plans are always priced in US dollars.</span>
+      </p>
+      <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {WORKSPACE_CURRENCY_OPTIONS.map((opt) => {
+          const isSel = selected === opt.code;
+          return (
+            <button
+              key={opt.code}
+              type="button"
+              onClick={() => onChange("preferredCurrency", opt.code)}
+              className={cn(
+                "flex items-center justify-between gap-3 rounded-2xl border-2 px-4 py-3 text-left transition",
+                isSel
+                  ? "border-[#4F46E5] bg-violet-50/50 shadow-sm shadow-indigo-500/10"
+                  : "border-neutral-200 bg-white hover:border-neutral-300",
+              )}
+            >
+              <span>
+                <span className="block text-sm font-semibold text-neutral-900">{opt.label}</span>
+                <span className="text-xs text-[#777681]">{opt.code}</span>
+              </span>
+              <span className="text-lg font-semibold tabular-nums text-neutral-700">{opt.symbol}</span>
             </button>
           );
         })}

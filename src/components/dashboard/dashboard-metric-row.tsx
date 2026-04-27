@@ -9,6 +9,7 @@ type Props = {
   pendingPayCents: number;
   taskOpen: number;
   pendingOverdueCount: number;
+  workspaceDefaultCurrency: string;
 };
 
 export function DashboardMetricRow({
@@ -18,6 +19,7 @@ export function DashboardMetricRow({
   pendingPayCents,
   taskOpen,
   pendingOverdueCount,
+  workspaceDefaultCurrency,
 }: Props) {
   const cards = [
     {
@@ -36,14 +38,14 @@ export function DashboardMetricRow({
     },
     {
       label: "Revenue (MTD)",
-      value: formatMoney(revenueMtdCents),
+      value: formatMoney(revenueMtdCents, workspaceDefaultCurrency),
       sub: revenueMtdCents > 0 ? "Paid invoices" : "—",
       subClass: "text-emerald-600",
       icon: DollarSign,
     },
     {
       label: "Pending pay",
-      value: formatMoney(pendingPayCents),
+      value: formatMoney(pendingPayCents, workspaceDefaultCurrency),
       sub: pendingOverdueCount > 0 ? `${pendingOverdueCount} overdue` : "On track",
       subClass: pendingOverdueCount > 0 ? "text-amber-600" : "text-neutral-500",
       icon: AlertCircle,

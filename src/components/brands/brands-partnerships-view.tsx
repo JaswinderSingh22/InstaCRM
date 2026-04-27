@@ -7,7 +7,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { Download, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { deleteBrand } from "@/app/actions/crm";
-import { formatMoney } from "@/lib/money";
+import { formatMajorUnitsCompact, formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { BrandActivity, BrandContact, BrandContactStatus } from "@/types/database";
 import type { BrandWithMetrics } from "@/lib/data/brands-page";
@@ -40,6 +40,7 @@ type Props = {
   activities: BrandActivity[];
   brandNameById: Record<string, string>;
   initialQuery?: string;
+  workspaceDefaultCurrency: string;
 };
 
 function initialTwo(s: string) {
@@ -75,12 +76,12 @@ function ContactAvatar({ name, i }: { name: string; i: number }) {
   );
 }
 
-function shortRevenue(cents: number) {
-  const v = cents / 100;
-  if (v >= 1000) {
-    return `$${(v / 1000).toFixed(1).replace(/\.0$/, "")}k`;
+function shortRevenue(cents: number, currency: string) {
+  const major = cents / 100;
+  if (major >= 1000) {
+    return formatMajorUnitsCompact(major, currency);
   }
-  return formatMoney(cents, "USD");
+  return formatMoney(cents, currency);
 }
 
 function statusTone(
@@ -162,6 +163,7 @@ export function BrandsPartnershipsView({
   activities,
   brandNameById,
   initialQuery = "",
+  workspaceDefaultCurrency,
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -329,7 +331,7 @@ export function BrandsPartnershipsView({
                   </div>
                   <div className="grid grid-cols-3 gap-1.5 px-3 pb-3">
                     {[
-                      { k: "Total revenue", v: shortRevenue(b.metrics.revenueCents) },
+                      { k: "Total revenue", v: shortRevenue(b.metrics.revenueCents, workspaceDefaultCurrency) },
                       { k: "Deals", v: String(b.metrics.dealCount) },
                       {
                         k: "Avg pay",
@@ -525,7 +527,7 @@ export function BrandsPartnershipsView({
                         {a.body && <p className="mt-0.5 text-xs text-neutral-600">{a.body}</p>}
                         {a.amount_cents != null && a.kind === "payment" && (
                           <p className="mt-0.5 text-sm font-bold text-emerald-700">
-                            {formatMoney(a.amount_cents, "USD")}
+                            {formatMoney(a.amount_cents, workspaceDefaultCurrency)}
                           </p>
                         )}
                         <p className="text-[10px] text-neutral-400">

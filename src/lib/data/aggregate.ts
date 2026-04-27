@@ -1,5 +1,6 @@
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceActivityFeed } from "@/lib/data/activity-feed";
 import { format, startOfMonth, endOfMonth, subMonths, startOfWeek } from "date-fns";
 import type { DealStage } from "@/types/database";
 
@@ -26,6 +27,7 @@ export type DashboardMonthly = {
 
 export async function getDashboardData() {
   const { workspaceId, profile } = await requireWorkspace();
+  const workspaceDefaultCurrency = profile.workspace_default_currency;
   const supabase = await createClient();
   const now = new Date();
   const mtdStart = startOfMonth(now);
@@ -34,16 +36,17 @@ export async function getDashboardData() {
     { count: leadCount },
     { count: activeDealCount },
     { count: taskOpen },
-    { data: recentLeads },
     { data: allDealsStages },
     { data: paymentsRows },
     { data: pendingPayments },
     { data: taskReminders },
+    activityFeed,
   ] = await Promise.all([
     supabase
       .from("leads")
       .select("id", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId),
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null),
     supabase
       .from("deals")
       .select("id", { count: "exact", head: true })
@@ -54,12 +57,6 @@ export async function getDashboardData() {
       .select("id", { count: "exact", head: true })
       .eq("workspace_id", workspaceId)
       .eq("completed", false),
-    supabase
-      .from("leads")
-      .select("id, name, company, status, created_at")
-      .eq("workspace_id", workspaceId)
-      .order("created_at", { ascending: false })
-      .limit(6),
     supabase.from("deals").select("stage").eq("workspace_id", workspaceId),
     supabase
       .from("payments")
@@ -79,6 +76,7 @@ export async function getDashboardData() {
       .not("due_at", "is", null)
       .order("due_at", { ascending: true })
       .limit(5),
+    getWorkspaceActivityFeed(workspaceId, 24),
   ]);
 
   const paid = paymentsRows ?? [];
@@ -148,7 +146,7 @@ export async function getDashboardData() {
     revenueMtdCents,
     pendingPayCents,
     pendingOverdueCount,
-    recentLeads: recentLeads ?? [],
+    activityFeed,
     monthlyChart,
     funnel,
     reminders: (taskReminders ?? []).map((t) => ({
@@ -157,5 +155,6 @@ export async function getDashboardData() {
       dueAt: t.due_at!,
     })) as DashboardReminder[],
     weekLabel,
+    workspaceDefaultCurrency,
   };
 }

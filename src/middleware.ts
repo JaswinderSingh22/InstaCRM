@@ -6,6 +6,7 @@ const supabaseFetch: typeof fetch = (input, init) =>
 
 const protectedPaths = new Set([
   "/dashboard",
+  "/campaigns",
   "/leads",
   "/deals",
   "/brands",
@@ -15,6 +16,7 @@ const protectedPaths = new Set([
   "/templates",
   "/settings",
   "/billing",
+  "/analytics",
 ]);
 
 export async function middleware(request: NextRequest) {

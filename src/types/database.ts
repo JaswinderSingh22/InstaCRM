@@ -1,3 +1,48 @@
+/** Creator brand-campaign pipeline (briefs from WhatsApp, agencies, etc.) */
+export type CampaignStatus =
+  | "inbox"
+  | "applied"
+  | "shortlisted"
+  | "in_progress"
+  | "posted"
+  | "completed"
+  | "passed";
+
+export type CampaignCompensationType = "cash" | "barter" | "mixed" | "unknown";
+
+export type Campaign = {
+  id: string;
+  workspace_id: string;
+  title: string;
+  status: CampaignStatus;
+  position: number;
+  brand_name: string | null;
+  agency_name: string | null;
+  compensation_summary: string | null;
+  compensation_cents: number | null;
+  compensation_type: CampaignCompensationType;
+  deliverables: unknown;
+  shoot_date: string | null;
+  post_date: string | null;
+  post_date_end: string | null;
+  apply_url: string | null;
+  location_notes: string | null;
+  requirements_notes: string | null;
+  source_message: string | null;
+  currency: string;
+  created_at: string;
+  updated_at: string;
+  /** Auto-sync from campaign automation */
+  linked_brand_id: string | null;
+  linked_lead_id: string | null;
+  auto_task_applied_id: string | null;
+  auto_task_shoot_id: string | null;
+  auto_task_post_id: string | null;
+  auto_task_completed_id: string | null;
+  /** Deal row synced from this campaign’s pipeline */
+  linked_deal_id: string | null;
+};
+
 export type LeadStatus = "new" | "contacted" | "qualified" | "lost";
 export type DealStage = "lead" | "qualified" | "proposal" | "negotiation" | "won" | "lost";
 export type PaymentStatus = "pending" | "paid" | "overdue" | "canceled";
@@ -16,6 +61,8 @@ export type Lead = {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  /** When set, lead is archived (hidden from main Creators list). */
+  archived_at: string | null;
 };
 
 export type Brand = {
@@ -111,6 +158,19 @@ export type Template = {
   body: string;
   created_at: string;
   updated_at: string;
+};
+
+/** Dashboard / API activity feed (server-recorded CRM events). */
+export type WorkspaceActivityEvent = {
+  id: string;
+  workspace_id: string;
+  actor_id: string | null;
+  event_type: string;
+  title: string;
+  summary: string | null;
+  entity_type: string | null;
+  entity_id: string | null;
+  created_at: string;
 };
 
 export type UserSettings = {

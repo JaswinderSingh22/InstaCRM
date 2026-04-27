@@ -26,7 +26,8 @@ import {
   priorityPresentation,
   type LeadPriority,
 } from "@/lib/leads-display";
-import { deleteLead, updateLead } from "@/app/actions/crm";
+import { archiveLead, updateLead } from "@/app/actions/crm";
+import type { LeadsPageInsights } from "@/lib/data/leads-page-insights";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,12 +64,12 @@ const PRIORITY_FILTER_OPTS: { value: LeadPriority | "all"; label: string }[] = [
   { value: "low", label: "Low" },
 ];
 
-function exportLeadsCsv(rows: Lead[]) {
+function exportLeadsCsv(rows: Lead[], currencyCode: string) {
   const headers = [
     "Brand",
     "Primary contact",
     "Email",
-    "Budget (USD)",
+    `Budget (${currencyCode})`,
     "Lead source",
     "Status",
     "Priority",
@@ -103,9 +104,18 @@ function exportLeadsCsv(rows: Lead[]) {
 type Props = {
   leads: Lead[];
   initialQuery?: string;
+  insights: LeadsPageInsights;
+  archivedCount: number;
+  workspaceDefaultCurrency: string;
 };
 
-export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
+export function LeadsManagementView({
+  leads,
+  initialQuery = "",
+  insights,
+  archivedCount,
+  workspaceDefaultCurrency,
+}: Props) {
   const router = useRouter();
   const [searchText, setSearchText] = useState(initialQuery);
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "all">("all");
@@ -181,7 +191,15 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
             Track and nurture your brand partnerships and high-value creator leads.
           </p>
         </div>
-        <div className="w-full shrink-0 sm:w-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end">
+          {archivedCount > 0 ? (
+            <Link
+              href="/leads/archived"
+              className="text-sm font-medium text-neutral-600 underline-offset-4 hover:text-[#4F46E5] hover:underline"
+            >
+              Archived ({archivedCount})
+            </Link>
+          ) : null}
           <AddLeadModal />
         </div>
       </div>
@@ -194,7 +212,7 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
           <div>
             <p className="text-xs font-medium text-neutral-500">Total pipeline</p>
             <p className="text-lg font-bold tabular-nums text-neutral-900">
-              {formatMoney(metrics.pipelineCents, "USD")}
+              {formatMoney(metrics.pipelineCents, workspaceDefaultCurrency)}
             </p>
           </div>
         </div>
@@ -224,8 +242,8 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
         </div>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-neutral-200/80 bg-white p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex w-full min-w-0 flex-col gap-2 lg:max-w-md">
+      <div className="rounded-xl border border-neutral-200/80 bg-white p-4 shadow-sm">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-3">
           <Input
             type="search"
             value={searchText}
@@ -234,85 +252,83 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
               setPage(1);
             }}
             placeholder="Search brands, contacts, sources…"
-            className="h-9 rounded-lg border-neutral-200 bg-[#F8F9FC] text-sm"
+            className="h-9 w-full rounded-lg border-neutral-200 bg-[#F8F9FC] text-sm md:max-w-md md:flex-1 lg:max-w-lg"
           />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <label className="sr-only" htmlFor="lead-filter-status">
-            Status
-          </label>
-          <select
-            id="lead-filter-status"
-            className={filterSelectClass}
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as LeadStatus | "all");
-              setPage(1);
-            }}
-          >
-            {STATUS_FILTER_OPTS.map((o) => (
-              <option key={o.value} value={o.value}>
-                Status: {o.label}
-              </option>
-            ))}
-          </select>
-          <label className="sr-only" htmlFor="lead-filter-priority">
-            Priority
-          </label>
-          <select
-            id="lead-filter-priority"
-            className={filterSelectClass}
-            value={priorityFilter}
-            onChange={(e) => {
-              setPriorityFilter(e.target.value as LeadPriority | "all");
-              setPage(1);
-            }}
-          >
-            {PRIORITY_FILTER_OPTS.map((o) => (
-              <option key={o.value} value={o.value}>
-                Priority: {o.label}
-              </option>
-            ))}
-          </select>
-          <label className="sr-only" htmlFor="lead-filter-source">
-            Lead source
-          </label>
-          <select
-            id="lead-filter-source"
-            className={cn(filterSelectClass, "min-w-[10rem]")}
-            value={sourceFilter}
-            onChange={(e) => {
-              setSourceFilter(e.target.value);
-              setPage(1);
-            }}
-          >
-            <option value="all">Lead source: All</option>
-            {sourceOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={clearFilters}
-            className="text-sm font-medium text-[#4F46E5] hover:underline"
-          >
-            Clear filters
-          </button>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 lg:ml-auto">
-          <button
-            type="button"
-            onClick={() => exportLeadsCsv(filtered)}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "h-9 gap-1.5 rounded-lg border-sky-200 bg-sky-50/80 text-sky-900 hover:bg-sky-100",
-            )}
-          >
-            <Download className="size-3.5" />
-            Export .CSV
-          </button>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 md:justify-end">
+            <label className="sr-only" htmlFor="lead-filter-status">
+              Status
+            </label>
+            <select
+              id="lead-filter-status"
+              className={filterSelectClass}
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as LeadStatus | "all");
+                setPage(1);
+              }}
+            >
+              {STATUS_FILTER_OPTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  Status: {o.label}
+                </option>
+              ))}
+            </select>
+            <label className="sr-only" htmlFor="lead-filter-priority">
+              Priority
+            </label>
+            <select
+              id="lead-filter-priority"
+              className={filterSelectClass}
+              value={priorityFilter}
+              onChange={(e) => {
+                setPriorityFilter(e.target.value as LeadPriority | "all");
+                setPage(1);
+              }}
+            >
+              {PRIORITY_FILTER_OPTS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  Priority: {o.label}
+                </option>
+              ))}
+            </select>
+            <label className="sr-only" htmlFor="lead-filter-source">
+              Lead source
+            </label>
+            <select
+              id="lead-filter-source"
+              className={cn(filterSelectClass, "min-w-[9.5rem]")}
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="all">Lead source: All</option>
+              {sourceOptions.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => exportLeadsCsv(filtered, workspaceDefaultCurrency)}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "h-9 shrink-0 gap-1.5 rounded-lg border-sky-200 bg-sky-50/80 text-sky-900 hover:bg-sky-100",
+              )}
+            >
+              <Download className="size-3.5" />
+              Export .CSV
+            </button>
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="h-9 shrink-0 px-2 text-sm font-medium text-[#4F46E5] hover:underline"
+            >
+              Clear filters
+            </button>
+          </div>
         </div>
       </div>
 
@@ -339,7 +355,7 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
                     Primary contact
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    Budget
+                    Budget ({workspaceDefaultCurrency})
                   </TableHead>
                   <TableHead className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
                     Lead source
@@ -398,7 +414,7 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
                         </div>
                       </TableCell>
                       <TableCell className="tabular-nums text-neutral-800">
-                        {cents != null ? formatMoney(cents, "USD") : "—"}
+                        {cents != null ? formatMoney(cents, workspaceDefaultCurrency) : "—"}
                       </TableCell>
                       <TableCell className="text-neutral-600">
                         {l.source ?? "—"}
@@ -450,19 +466,24 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
-                              className="text-rose-600"
+                              className="text-neutral-800"
                               onClick={async () => {
-                                if (!confirm("Delete this lead?")) return;
+                                if (
+                                  !confirm(
+                                    "Archive this lead? You can restore it later from Archived leads.",
+                                  )
+                                )
+                                  return;
                                 try {
-                                  await deleteLead(l.id);
-                                  toast.success("Deleted");
+                                  await archiveLead(l.id);
+                                  toast.success("Lead archived");
                                   router.refresh();
                                 } catch (e) {
                                   toast.error(e instanceof Error ? e.message : "Error");
                                 }
                               }}
                             >
-                              Delete lead
+                              Archive lead
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -525,8 +546,14 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
         <div className="flex flex-col justify-between rounded-2xl bg-gradient-to-br from-[#4c1d95] via-[#5b21b6] to-indigo-900 p-6 text-white shadow-lg">
           <div>
             <h2 className="text-lg font-bold">Campaign ready?</h2>
-            <p className="mt-2 max-w-sm text-sm text-violet-100/90">
-              Review open deals and contracts before you kick off the next creator wave.
+            <p className="mt-2 max-w-md text-sm text-violet-100/90">
+              {insights.campaignReady.openDealsCount === 0
+                ? "No open deals in your pipeline yet. Move qualified leads on the Deals board when you&apos;re ready to negotiate."
+                : `You have ${insights.campaignReady.openDealsCount} open deal${insights.campaignReady.openDealsCount === 1 ? "" : "s"} in your pipeline${
+                    insights.campaignReady.dealsInNegotiation > 0
+                      ? `, including ${insights.campaignReady.dealsInNegotiation} in negotiation`
+                      : ""
+                  }. Review them before your next creator push.`}
             </p>
           </div>
           <Link
@@ -536,22 +563,53 @@ export function LeadsManagementView({ leads, initialQuery = "" }: Props) {
               "mt-6 w-fit rounded-xl border-0 bg-white font-semibold text-violet-900 hover:bg-violet-50",
             )}
           >
-            Review contracts
+            Open deals board
           </Link>
         </div>
         <div className="rounded-2xl border border-neutral-200/80 bg-white p-6 shadow-sm">
           <h2 className="text-lg font-bold text-neutral-900">Lead growth</h2>
-          <p className="mt-1 text-sm text-neutral-500">
-            Your lead acquisition is up 24% compared to last month.
+          <p className="mt-1 text-sm text-neutral-600">
+            {(() => {
+              const { pctVsPreviousMonth, thisMonthCount, prevMonthCount } = insights.leadGrowth;
+              const trend =
+                pctVsPreviousMonth > 0
+                  ? `up ${pctVsPreviousMonth}% vs last month`
+                  : pctVsPreviousMonth < 0
+                    ? `down ${Math.abs(pctVsPreviousMonth)}% vs last month`
+                    : "flat vs last month";
+              return `This month: ${thisMonthCount} new lead${thisMonthCount === 1 ? "" : "s"}. Last month: ${prevMonthCount}. Net new leads are ${trend}.`;
+            })()}
           </p>
-          <div className="mt-6 flex h-28 items-end justify-between gap-2 px-1">
-            {[40, 55, 48, 72, 65, 88, 92].map((h, i) => (
-              <div
-                key={i}
-                className="flex-1 rounded-t-md bg-gradient-to-t from-sky-200 to-sky-500"
-                style={{ height: `${h}%` }}
-              />
-            ))}
+          <div className="mt-6">
+            {/* Columns must stretch to h-24 so bar height % has a defined containing block (items-end was collapsing bar height to 0). */}
+            <div className="flex h-24 items-stretch justify-between gap-1 px-0.5 sm:gap-1.5">
+              {(() => {
+                const counts = insights.leadGrowth.monthlyCounts.map((m) => m.count);
+                const max = Math.max(1, ...counts);
+                return insights.leadGrowth.monthlyCounts.map((m, i) => {
+                  const barPct = Math.max(m.count === 0 ? 4 : 10, (m.count / max) * 100);
+                  return (
+                    <div
+                      key={m.label + i}
+                      className="flex min-h-0 min-w-0 flex-1 flex-col justify-end"
+                      title={`${m.label}: ${m.count} new`}
+                    >
+                      <div
+                        className="mx-auto w-full min-w-[6px] max-w-10 rounded-t-md bg-gradient-to-t from-sky-200 to-sky-500"
+                        style={{ height: `${barPct}%` }}
+                      />
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+            <div className="mt-1 flex justify-between gap-1 px-0.5 text-[9px] font-medium text-neutral-400 sm:text-[10px]">
+              {insights.leadGrowth.monthlyCounts.map((m, i) => (
+                <span key={m.label + i} className="min-w-0 flex-1 truncate text-center">
+                  {m.label}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>

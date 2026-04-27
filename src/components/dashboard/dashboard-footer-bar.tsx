@@ -1,6 +1,3 @@
-import Link from "next/link";
-import { Plus } from "lucide-react";
-
 // const links = [
 //   { href: "#", label: "Privacy" },
 //   { href: "#", label: "Terms" },
@@ -25,13 +22,7 @@ export function DashboardFooterBar() {
           ))}
         </nav> */}
       </div>
-      <Link
-        href="/leads"
-        className="fixed bottom-6 right-6 z-50 flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-[#4F46E5] to-indigo-600 text-white shadow-lg shadow-indigo-500/30 transition hover:scale-105"
-        aria-label="Add lead"
-      >
-        <Plus className="size-6" />
-      </Link>
+      {/* Floating add lead FAB removed on dashboard — use Creators nav to add leads. */}
     </div>
   );
 }

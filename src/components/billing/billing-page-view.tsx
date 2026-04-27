@@ -148,6 +148,9 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
       </div>
 
       <section>
+          <p className="mb-4 text-xs text-neutral-500">
+            Subscription plans are billed in <span className="font-medium text-neutral-700">US dollars (USD)</span>.
+          </p>
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
             <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-white p-1 shadow-sm">
               <button

@@ -1,3 +1,4 @@
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import type { OnboardingAnswers } from "@/lib/types/onboarding";
 import { isFollowerTier } from "@/lib/types/onboarding";
 
@@ -14,6 +15,9 @@ export function parseOnboardingRecord(r: Record<string, unknown> | null): Partia
   }
   if (typeof r.niche === "string") out.niche = r.niche;
   if (typeof r.monetization === "string") out.monetization = r.monetization;
+  if (typeof r.preferredCurrency === "string") {
+    out.preferredCurrency = normalizeWorkspaceCurrency(r.preferredCurrency);
+  }
   if (typeof r.growthGoals === "string") out.growthGoals = r.growthGoals;
   return out;
 }

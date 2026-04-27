@@ -13,10 +13,17 @@ import {
 } from "recharts";
 import { cn } from "@/lib/utils";
 import type { DashboardMonthly } from "@/lib/data/aggregate";
+import { formatMajorUnitsAmount, formatMajorUnitsCompact } from "@/lib/money";
 
 type Row = DashboardMonthly;
 
-export function RevenueComposedChart({ data }: { data: Row[] }) {
+export function RevenueComposedChart({
+  data,
+  workspaceDefaultCurrency,
+}: {
+  data: Row[];
+  workspaceDefaultCurrency: string;
+}) {
   const [mode, setMode] = useState<"commission" | "ad_spend">("commission");
   const chartData = data.map((d) => ({
     name: d.monthLabel + (d.isCurrent ? " (Current)" : ""),
@@ -78,7 +85,9 @@ export function RevenueComposedChart({ data }: { data: Row[] }) {
               tickLine={false}
               axisLine={false}
               tick={{ className: "text-xs fill-neutral-500" }}
-              tickFormatter={(v) => `$${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`}
+              tickFormatter={(v) =>
+                formatMajorUnitsCompact(typeof v === "number" ? v : Number(v), workspaceDefaultCurrency)
+              }
             />
             <Tooltip
               contentStyle={{
@@ -88,7 +97,10 @@ export function RevenueComposedChart({ data }: { data: Row[] }) {
               }}
               formatter={(v) => {
                 const n = typeof v === "number" ? v : Number(v);
-                return [`$${Number.isFinite(n) ? n.toLocaleString() : String(v)}`, ""];
+                return [
+                  Number.isFinite(n) ? formatMajorUnitsAmount(n, workspaceDefaultCurrency) : String(v),
+                  "",
+                ];
               }}
             />
             <Bar dataKey="bar" fill="url(#revenueBarGrad)" radius={[4, 4, 0, 0]} maxBarSize={40} />

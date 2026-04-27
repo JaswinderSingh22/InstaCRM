@@ -5,7 +5,8 @@ import Link from "next/link";
 import { Camera, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { updateProfile, updateUserSettings } from "@/app/actions/crm";
+import { updateProfile, updateUserSettings, updateWorkspaceDefaultCurrency } from "@/app/actions/crm";
+import { WORKSPACE_CURRENCY_OPTIONS, normalizeWorkspaceCurrency } from "@/lib/currency";
 import type { UserSettings } from "@/types/database";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -66,6 +67,7 @@ type Props = {
   settings: UserSettings | null;
   workspacePlan: string | null;
   subscriptionStatus: string;
+  workspaceDefaultCurrency: string;
 };
 
 export function AccountSettingsView({
@@ -75,6 +77,7 @@ export function AccountSettingsView({
   settings,
   workspacePlan,
   subscriptionStatus,
+  workspaceDefaultCurrency,
 }: Props) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -97,6 +100,7 @@ export function AccountSettingsView({
   const [systemNews, setSystemNews] = useState(settings?.system_news ?? false);
 
   const [saving, setSaving] = useState(false);
+  const [currencySaving, setCurrencySaving] = useState(false);
   const [dirtyProfile, setDirtyProfile] = useState(false);
 
   const displayEmail = workEmail.trim() || authEmail;
@@ -338,6 +342,40 @@ export function AccountSettingsView({
                     </select>
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="workspace-currency">Workspace currency</Label>
+                  <p className="text-xs text-neutral-500">
+                    Shown for deals, campaigns, invoices, and dashboard totals. Subscription plans are always in{" "}
+                    <span className="font-medium text-neutral-700">US dollars</span>.
+                  </p>
+                  <select
+                    id="workspace-currency"
+                    value={normalizeWorkspaceCurrency(workspaceDefaultCurrency)}
+                    disabled={currencySaving}
+                    onChange={(e) => {
+                      const v = normalizeWorkspaceCurrency(e.target.value);
+                      setCurrencySaving(true);
+                      void (async () => {
+                        try {
+                          await updateWorkspaceDefaultCurrency(v);
+                          toast.success("Workspace currency updated");
+                          router.refresh();
+                        } catch (err) {
+                          toast.error(err instanceof Error ? err.message : "Could not update currency");
+                        } finally {
+                          setCurrencySaving(false);
+                        }
+                      })();
+                    }}
+                    className="flex h-11 w-full rounded-lg border border-neutral-200 bg-[#F8F9FC] px-3 text-sm text-neutral-900 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/20 disabled:opacity-60"
+                  >
+                    {WORKSPACE_CURRENCY_OPTIONS.map((o) => (
+                      <option key={o.code} value={o.code}>
+                        {o.symbol} {o.label} ({o.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex flex-col-reverse gap-2 border-t border-neutral-100 pt-4 sm:flex-row sm:justify-end">
                   <Button
                     type="button"
@@ -555,7 +593,9 @@ export function AccountSettingsView({
         <Card className="max-w-xl border-neutral-200/80 bg-white shadow-sm ring-neutral-200/60">
           <CardHeader>
             <CardTitle className="text-base font-semibold text-neutral-900">Billing</CardTitle>
-            <CardDescription>Workspace plan and Stripe subscription.</CardDescription>
+            <CardDescription>
+              Workspace plan and Stripe subscription. Plans are priced in US dollars.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-xl border border-neutral-100 bg-[#F8F9FC] p-4">

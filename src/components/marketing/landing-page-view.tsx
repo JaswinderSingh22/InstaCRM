@@ -28,11 +28,11 @@ export function LandingPageView() {
             className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(99,102,241,0.12),transparent_50%)]"
             aria-hidden
           />
-          <div className="pointer-events-none absolute top-0 right-0 h-[400px] w-[400px] bg-rose-100/30 blur-3xl" />
+          <div className="pointer-events-none absolute top-0 right-0 h-100 w-100 bg-rose-100/30 blur-3xl" />
           <div className="relative mx-auto max-w-4xl text-center">
             <div className="flex justify-center">
               <PillBadge>
-                <span className="text-[10px]">●</span> v2.0 now live for creators
+                <span className="text-[10px]">●</span> V2.0 now live for creators
               </PillBadge>
             </div>
             <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight text-balance sm:text-5xl md:text-6xl">
@@ -42,16 +42,15 @@ export function LandingPageView() {
               </GradientText>
             </h1>
             <p className="mx-auto mt-5 max-w-2xl text-balance text-base text-[#777681] sm:text-lg">
-              InstaCRM is the operating system for creator-led businesses — leads, deals,
-              invoicing, and analytics in one beautiful workspace. Built for Instagram-forward
-              brands and the agencies behind them.
+              The only CRM built for high-growth Instagram creators. Manage your entire business
+              lifecycle from outreach to invoice in one beautiful workspace.
             </p>
             <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
               <Link
                 href="/signup"
                 className={cn(
                   buttonVariants({ size: "lg" }),
-                  "h-12 rounded-xl bg-gradient-to-r from-[#4F46E5] to-[#6366f1] px-8 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 hover:from-[#4338ca]",
+                  "h-12 rounded-xl bg-linear-to-r from-[#4F46E5] to-[#6366f1] px-8 text-base font-semibold text-white shadow-lg shadow-indigo-500/30 hover:from-[#4338ca]",
                 )}
               >
                 Start Free Trial
@@ -80,11 +79,6 @@ export function LandingPageView() {
             />
             <div className="mt-12 sm:mt-16">
               <FeaturesBento />
-            </div>
-            <div className="mt-10 flex flex-wrap items-center justify-center gap-8 sm:gap-16 md:mt-12">
-              <StarRating />
-              <StarRating />
-              <StarRating />
             </div>
           </div>
         </section>
@@ -118,7 +112,7 @@ export function LandingPageView() {
           <div className="mx-auto max-w-6xl">
             <SectionHeader
               title="Transparent pricing for creators"
-              description="Pick a plan that matches your current growth stage."
+              description="Pick a plan that matches your current growth stage. Prices shown in US dollars; your CRM can use your local currency for deals and invoices."
             />
             <div className="mt-12 grid gap-6 md:grid-cols-3 md:items-stretch">
               <PricingCard

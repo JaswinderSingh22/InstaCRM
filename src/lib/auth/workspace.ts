@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 
 export type SessionProfile = {
   default_workspace_id: string;
@@ -8,6 +9,8 @@ export type SessionProfile = {
   avatar_url: string | null;
   onboarding_completed_at: string | null;
   onboarding_answers: Record<string, unknown>;
+  /** ISO 4217; CRM display default. Plan prices remain USD. */
+  workspace_default_currency: string;
 };
 
 export type SessionContext = {
@@ -16,7 +19,10 @@ export type SessionContext = {
   profile: SessionProfile;
 };
 
-export function rowToSessionProfile(row: Record<string, unknown> | null | undefined): SessionProfile | null {
+export function rowToSessionProfile(row: Record<string, unknown> | null | undefined): Omit<
+  SessionProfile,
+  "workspace_default_currency"
+> | null {
   const wid = row?.default_workspace_id;
   if (typeof wid !== "string" || !wid) {
     return null;
@@ -62,7 +68,30 @@ export async function loadSessionProfile(userId: string): Promise<SessionProfile
   if (!row) {
     return null;
   }
-  return rowToSessionProfile(row as unknown as Record<string, unknown>);
+  const base = rowToSessionProfile(row as unknown as Record<string, unknown>);
+  if (!base) {
+    return null;
+  }
+
+  let workspace_default_currency = "INR";
+  const { data: ws, error: wsErr } = await supabase
+    .from("workspaces")
+    .select("default_currency")
+    .eq("id", base.default_workspace_id)
+    .maybeSingle();
+
+  if (!wsErr && ws && typeof (ws as Record<string, unknown>).default_currency === "string") {
+    workspace_default_currency = normalizeWorkspaceCurrency(
+      (ws as Record<string, unknown>).default_currency as string,
+    );
+  } else {
+    const pc = base.onboarding_answers.preferredCurrency;
+    if (typeof pc === "string") {
+      workspace_default_currency = normalizeWorkspaceCurrency(pc);
+    }
+  }
+
+  return { ...base, workspace_default_currency };
 }
 
 /**

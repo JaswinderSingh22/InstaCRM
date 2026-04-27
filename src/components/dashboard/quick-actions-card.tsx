@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { UserPlus, FileText, PenLine, User } from "lucide-react";
+import { UserPlus, FileText, Megaphone, User } from "lucide-react";
 
 const actions = [
+  { label: "Track a campaign", href: "/campaigns", icon: Megaphone },
   { label: "Add new lead", href: "/leads", icon: UserPlus },
   { label: "Create invoice", href: "/payments", icon: FileText },
-  { label: "Sign contract", href: "/deals", icon: PenLine },
   { label: "Public profile", href: "/settings", icon: User },
 ] as const;
 

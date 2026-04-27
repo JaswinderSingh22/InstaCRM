@@ -1,4 +1,5 @@
 import { requireWorkspace } from "@/lib/auth/workspace";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import { createClient } from "@/lib/supabase/server";
 import { PageFade } from "@/components/layout/page-fade";
 import { AccountSettingsView } from "@/components/settings/account-settings-view";
@@ -30,7 +31,7 @@ export default async function SettingsPage() {
 
   const { data: ws } = await supabase
     .from("workspaces")
-    .select("plan, subscription_status")
+    .select("plan, subscription_status, default_currency")
     .eq("id", workspaceId)
     .single();
 
@@ -66,6 +67,9 @@ export default async function SettingsPage() {
         settings={settings}
         workspacePlan={ws?.plan ?? null}
         subscriptionStatus={typeof ws?.subscription_status === "string" ? ws.subscription_status : "none"}
+        workspaceDefaultCurrency={normalizeWorkspaceCurrency(
+          (ws as { default_currency?: string } | null)?.default_currency ?? profile.workspace_default_currency,
+        )}
       />
     </PageFade>
   );

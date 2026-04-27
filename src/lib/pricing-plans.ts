@@ -1,6 +1,9 @@
 /**
  * Single source of truth for public pricing (landing + in-app billing).
  * Stripe checkout still uses your configured price IDs; amounts here are what we display.
+ *
+ * All plan amounts are US dollars (USD). Workspace CRM money (deals, campaigns, etc.) uses
+ * the user's chosen currency separately — do not convert these figures.
  */
 
 export const YEARLY_BILLING_DISCOUNT = 0.2;
@@ -54,6 +57,7 @@ export function yearlyMonthlyEquivalent(monthly: number) {
   return Math.round(monthly * 12 * (1 - YEARLY_BILLING_DISCOUNT)) / 12;
 }
 
+/** Format a subscription plan price in USD (not workspace CRM currency). */
 export function formatPlanPrice(amount: number) {
   if (amount <= 0) return "$0";
   if (Number.isInteger(amount)) return `$${amount}`;

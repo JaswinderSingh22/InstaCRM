@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import { isFollowerTier, type OnboardingAnswers } from "@/lib/types/onboarding";
 
 function sanitize(
@@ -19,6 +20,9 @@ function sanitize(
   }
   if (a.followerCount != null && Number.isFinite(a.followerCount) && a.followerCount >= 0) {
     out.followerCount = Math.round(a.followerCount);
+  }
+  if (a.preferredCurrency?.trim()) {
+    out.preferredCurrency = normalizeWorkspaceCurrency(a.preferredCurrency);
   }
   return out;
 }
@@ -66,8 +70,23 @@ export async function completeOnboarding(answers: OnboardingAnswers) {
   if (error) {
     return { error: error.message };
   }
+
+  const code = normalizeWorkspaceCurrency(
+    typeof merged.preferredCurrency === "string" ? merged.preferredCurrency : undefined,
+  );
+  const { data: prof } = await supabase
+    .from("profiles")
+    .select("default_workspace_id")
+    .eq("id", user.id)
+    .maybeSingle();
+  const wid = prof?.default_workspace_id;
+  if (typeof wid === "string" && wid) {
+    await supabase.from("workspaces").update({ default_currency: code }).eq("id", wid);
+  }
+
   revalidatePath("/", "layout");
   revalidatePath("/onboarding");
   revalidatePath("/dashboard");
+  revalidatePath("/settings");
   return { ok: true as const };
 }

@@ -3,6 +3,7 @@ import {
   Calendar,
   CreditCard,
   LayoutDashboard,
+  Megaphone,
   Settings,
   Sparkles,
   SquareKanban,
@@ -12,6 +13,7 @@ import {
 /** Primary — matches new dashboard design */
 export const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
   { href: "/leads", label: "Creators", icon: Users },
   { href: "/deals", label: "Deals", icon: SquareKanban },
   { href: "/brands", label: "Brands", icon: Building2 },

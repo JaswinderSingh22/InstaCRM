@@ -4,14 +4,21 @@ import { useState } from "react";
 import { DealsKanban } from "@/components/deals/deals-kanban";
 import { DealsPipelineHeader } from "@/components/deals/deals-pipeline-header";
 import { AddDealModal } from "@/components/deals/add-deal-modal";
-import { DealsPipelineFab } from "@/components/deals/deals-pipeline-fab";
 import type { Deal, DealStage } from "@/types/database";
+
+export type DealsSummary = {
+  openCount: number;
+  pipelineValueCents: number;
+  totalDeals: number;
+};
 
 type Props = {
   initial: Deal[];
+  summary: DealsSummary;
+  workspaceDefaultCurrency: string;
 };
 
-export function DealsView({ initial }: Props) {
+export function DealsView({ initial, summary, workspaceDefaultCurrency }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [addStage, setAddStage] = useState<DealStage>("lead");
 
@@ -21,11 +28,19 @@ export function DealsView({ initial }: Props) {
   };
 
   return (
-    <div className="relative min-h-[60vh] pb-20 md:pb-6">
-      <DealsPipelineHeader onAddDeal={() => openAdd("lead")} />
+    <div className="relative min-h-[60vh] pb-6">
+      <DealsPipelineHeader
+        summary={summary}
+        onAddDeal={() => openAdd("lead")}
+        workspaceDefaultCurrency={workspaceDefaultCurrency}
+      />
       <DealsKanban initial={initial} onAddDeal={openAdd} />
-      <AddDealModal open={addOpen} onOpenChange={setAddOpen} defaultStage={addStage} />
-      <DealsPipelineFab onClick={() => openAdd("lead")} />
+      <AddDealModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        defaultStage={addStage}
+        defaultCurrency={workspaceDefaultCurrency}
+      />
     </div>
   );
 }

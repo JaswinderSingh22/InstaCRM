@@ -13,19 +13,39 @@ function whenLabel(iso: string) {
   return `Scheduled for ${format(d, "MMMM d, yyyy")}`;
 }
 
-export function RemindersSection({ reminders }: { reminders: DashboardReminder[] }) {
-  return (
-    <div className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm">
+type Props = {
+  reminders: DashboardReminder[];
+  /** When set, the whole card links here (e.g. dashboard → /calendar). */
+  clickThroughHref?: string;
+};
+
+export function RemindersSection({ reminders, clickThroughHref }: Props) {
+  const shell =
+    "rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm" +
+    (clickThroughHref
+      ? " transition hover:border-[#4F46E5]/35 hover:shadow-md hover:ring-1 hover:ring-[#4F46E5]/15"
+      : "");
+
+  const body = (
+    <>
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-semibold text-neutral-900">Reminders</h3>
-        <ListFilter className="size-4 text-neutral-400" aria-hidden />
+        {clickThroughHref ? (
+          <span className="text-xs font-semibold text-[#4F46E5]">Open calendar →</span>
+        ) : (
+          <ListFilter className="size-4 text-neutral-400" aria-hidden />
+        )}
       </div>
       {reminders.length === 0 ? (
         <p className="text-sm text-neutral-500">
           No due dates on open tasks.{" "}
-          <Link href="/calendar" className="font-medium text-[#4F46E5] hover:underline">
-            Add a task
-          </Link>
+          {clickThroughHref ? (
+            <span className="font-medium text-[#4F46E5]">Add tasks on your calendar.</span>
+          ) : (
+            <Link href="/calendar" className="font-medium text-[#4F46E5] hover:underline">
+              Add a task
+            </Link>
+          )}
         </p>
       ) : (
         <>
@@ -43,11 +63,28 @@ export function RemindersSection({ reminders }: { reminders: DashboardReminder[]
               </li>
             ))}
           </ul>
-          <Link href="/calendar" className="mt-2 block text-center text-xs font-medium text-[#4F46E5] hover:underline">
-            View all tasks
-          </Link>
+          {clickThroughHref ? (
+            <p className="mt-2 text-center text-xs font-semibold text-[#4F46E5]">View all on calendar →</p>
+          ) : (
+            <Link
+              href="/calendar"
+              className="mt-2 block text-center text-xs font-medium text-[#4F46E5] hover:underline"
+            >
+              View all tasks
+            </Link>
+          )}
         </>
       )}
-    </div>
+    </>
   );
+
+  if (clickThroughHref) {
+    return (
+      <Link href={clickThroughHref} className={cn("block", shell)}>
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className={shell}>{body}</div>;
 }

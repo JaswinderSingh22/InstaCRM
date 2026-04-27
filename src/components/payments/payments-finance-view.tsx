@@ -32,7 +32,7 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { updatePayment } from "@/app/actions/crm";
-import { formatMoney } from "@/lib/money";
+import { formatMajorUnitsAmount, formatMajorUnitsCompact, formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { Payment, PaymentStatus } from "@/types/database";
 import { buttonVariants } from "@/components/ui/button";
@@ -42,6 +42,7 @@ import { PaymentForm } from "@/components/payments/payment-section";
 type Props = {
   rows: Payment[];
   initialQuery?: string;
+  workspaceDefaultCurrency: string;
 };
 
 const PAGE_SIZE = 4;
@@ -154,7 +155,7 @@ function exportCsv(rows: Payment[]) {
   URL.revokeObjectURL(a.href);
 }
 
-export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
+export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultCurrency }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const q = searchParams.get("q") ?? initialQuery;
@@ -272,7 +273,7 @@ export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
               <Download className="size-3.5" />
               Export CSV
             </button>
-            <PaymentForm />
+            <PaymentForm defaultCurrency={workspaceDefaultCurrency} />
           </div>
         </div>
 
@@ -285,7 +286,7 @@ export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
               <AlertTriangle className="size-4 text-rose-500" />
             </div>
             <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900">
-              {formatMoney(metrics.overdueCents, "USD")}
+              {formatMoney(metrics.overdueCents, workspaceDefaultCurrency)}
             </p>
             <p className="mt-0.5 text-xs text-rose-600">Review due dates in the table below</p>
           </div>
@@ -297,7 +298,7 @@ export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
               <Clock className="size-4 text-violet-500" />
             </div>
             <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900">
-              {formatMoney(metrics.pendingCents, "USD")}
+              {formatMoney(metrics.pendingCents, workspaceDefaultCurrency)}
             </p>
             <p className="mt-0.5 text-xs text-neutral-500">Expected per due dates in list</p>
           </div>
@@ -309,7 +310,7 @@ export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
               <CheckCircle2 className="size-4 text-teal-600" />
             </div>
             <p className="mt-2 text-2xl font-bold tabular-nums text-neutral-900">
-              {formatMoney(metrics.paidThisMonthCents, "USD")}
+              {formatMoney(metrics.paidThisMonthCents, workspaceDefaultCurrency)}
             </p>
             <p className="mt-0.5 text-xs text-neutral-500">
               {metrics.paidThisMonthCount} payment{metrics.paidThisMonthCount === 1 ? "" : "s"}{" "}
@@ -447,14 +448,16 @@ export function PaymentsFinanceView({ rows, initialQuery = "" }: Props) {
                     tickLine={false}
                     axisLine={false}
                     tick={{ fontSize: 10, fill: "var(--color-neutral-500)" }}
-                    tickFormatter={(v) => `$${v}`}
+                    tickFormatter={(v) =>
+                      formatMajorUnitsCompact(Number(v), workspaceDefaultCurrency)
+                    }
                   />
                   <Tooltip
                     cursor={{ fill: "rgba(79, 70, 229, 0.06)" }}
                     formatter={(value) => {
                       const n = Number(value);
                       if (Number.isNaN(n)) return [String(value), "Paid"];
-                      return [`$${n.toLocaleString()}`, "Paid"];
+                      return [formatMajorUnitsAmount(n, workspaceDefaultCurrency), "Paid"];
                     }}
                   />
                   <Bar dataKey="dollars" radius={[6, 6, 0, 0]} name="Payouts" barSize={28}>

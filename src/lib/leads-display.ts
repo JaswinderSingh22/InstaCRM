@@ -11,10 +11,15 @@ export function parseLeadPriority(notes: string | null): LeadPriority {
   return "med";
 }
 
-/** Parsed estimated budget from notes (cents), if present. */
+/** Parsed estimated budget from notes (stored value is major units → returned as cents). */
 export function parseLeadBudgetCents(notes: string | null): number | null {
   if (!notes) return null;
-  const m = notes.match(/Estimated budget:\s*\$?([\d,]+(?:\.\d+)?)/i);
+  let m = notes.match(
+    /Estimated budget:\s*(?:USD|INR|EUR|GBP|AUD|CAD|\$|₹|€|£|A\$)?\s*([\d,]+(?:\.\d+)?)/i,
+  );
+  if (!m) {
+    m = notes.match(/Budget\s*\([^)]*\):\s*([\d,]+(?:\.\d+)?)/i);
+  }
   if (!m) return null;
   const n = Number(m[1]!.replace(/,/g, ""));
   if (Number.isNaN(n) || n <= 0) return null;

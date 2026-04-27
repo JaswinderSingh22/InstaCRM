@@ -5,16 +5,14 @@ import { RevenueComposedChart } from "@/components/dashboard/revenue-composed-ch
 import { DealFunnelCard } from "@/components/dashboard/deal-funnel-card";
 import { DashboardActivitySection } from "@/components/dashboard/dashboard-activity-section";
 import { RemindersSection } from "@/components/dashboard/reminders-section";
-import { QuickActionsCard } from "@/components/dashboard/quick-actions-card";
+import { DashboardAnalyticsLinkCard } from "@/components/dashboard/dashboard-analytics-link-card";
 import { DashboardFooterBar } from "@/components/dashboard/dashboard-footer-bar";
-import Link from "next/link";
-import { buttonVariants } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 export const metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
   const d = await getDashboardData();
+  const cur = d.workspaceDefaultCurrency;
   const funnelTotal =
     d.funnel.awareness + d.funnel.interest + d.funnel.negotiation + d.funnel.closed;
   const efficiencyPct = funnelTotal > 0 ? (d.funnel.closed / funnelTotal) * 100 : 0;
@@ -33,15 +31,6 @@ export default async function DashboardPage() {
             <span className="rounded-full border border-neutral-200 bg-white px-3 py-1.5 text-xs font-medium text-neutral-600">
               {d.weekLabel}
             </span>
-            <Link
-              href="/tasks"
-              className={cn(
-                buttonVariants(),
-                "rounded-full border-0 bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white shadow-md shadow-indigo-500/20 hover:from-[#4338ca] hover:to-indigo-600",
-              )}
-            >
-              + Add goal
-            </Link>
           </div>
         </div>
 
@@ -52,6 +41,7 @@ export default async function DashboardPage() {
           pendingPayCents={d.pendingPayCents}
           taskOpen={d.taskOpen}
           pendingOverdueCount={d.pendingOverdueCount}
+          workspaceDefaultCurrency={cur}
         />
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -62,7 +52,7 @@ export default async function DashboardPage() {
                 <p className="text-xs text-neutral-500">Paid invoices by month</p>
               </div>
             </div>
-            <RevenueComposedChart data={d.monthlyChart} />
+            <RevenueComposedChart data={d.monthlyChart} workspaceDefaultCurrency={cur} />
           </div>
           <DealFunnelCard
             funnel={d.funnel}
@@ -72,9 +62,9 @@ export default async function DashboardPage() {
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <DashboardActivitySection recentLeads={d.recentLeads} />
-          <RemindersSection reminders={d.reminders} />
-          <QuickActionsCard />
+          <DashboardActivitySection activities={d.activityFeed} viewAllHref="/dashboard" />
+          <RemindersSection reminders={d.reminders} clickThroughHref="/calendar" />
+          <DashboardAnalyticsLinkCard />
         </div>
 
         <DashboardFooterBar />

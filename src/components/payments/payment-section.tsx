@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import type { Payment } from "@/types/database";
 import { formatMoney } from "@/lib/money";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import {
   Table,
   TableBody,
@@ -18,7 +19,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export function PaymentForm() {
+export function PaymentForm({ defaultCurrency }: { defaultCurrency: string }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   if (!open) {
@@ -48,6 +49,7 @@ export function PaymentForm() {
             status: (fd.get("status") as Payment["status"]) || "pending",
             dueDate: due ? String(due) : null,
             description: String(fd.get("desc") || "") || null,
+            currency: normalizeWorkspaceCurrency(defaultCurrency),
           });
           setOpen(false);
           toast.success("Saved");
@@ -63,7 +65,7 @@ export function PaymentForm() {
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
-          <Label>Amount (USD)</Label>
+          <Label>Amount ({normalizeWorkspaceCurrency(defaultCurrency)})</Label>
           <Input name="amount" type="number" step="0.01" min="0" required />
         </div>
         <div>

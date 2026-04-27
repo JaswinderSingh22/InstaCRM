@@ -25,7 +25,7 @@ function Loading() {
 export default async function BrandsPage({ searchParams }: Props) {
   const p = await searchParams;
   const initialQuery = typeof p.q === "string" ? p.q : "";
-  const { workspaceId } = await requireWorkspace();
+  const { workspaceId, profile } = await requireWorkspace();
   const data = await getBrandsPageData(workspaceId);
 
   return (
@@ -36,6 +36,7 @@ export default async function BrandsPage({ searchParams }: Props) {
         activities={data.activities}
         brandNameById={data.brandNameById}
         initialQuery={initialQuery}
+        workspaceDefaultCurrency={profile.workspace_default_currency}
       />
     </Suspense>
   );

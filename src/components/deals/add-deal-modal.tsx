@@ -16,6 +16,8 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import type { DealStage } from "@/types/database";
+import { currencySymbol } from "@/lib/money";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
 
 const STAGE_OPTIONS: { id: DealStage; label: string }[] = [
   { id: "lead", label: "New inquiry" },
@@ -30,9 +32,10 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultStage: DealStage;
+  defaultCurrency: string;
 };
 
-export function AddDealModal({ open, onOpenChange, defaultStage }: Props) {
+export function AddDealModal({ open, onOpenChange, defaultStage, defaultCurrency }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [stage, setStage] = useState<DealStage>(defaultStage);
@@ -58,13 +61,14 @@ export function AddDealModal({ open, onOpenChange, defaultStage }: Props) {
             const title = String(fd.get("title") ?? "").trim();
             const dollars = String(fd.get("value") ?? "").replace(/[$,\s]/g, "");
             const v = Math.max(0, Math.round((Number(dollars) || 0) * 100));
+            const cur = normalizeWorkspaceCurrency(defaultCurrency);
             if (!title) {
               toast.error("Enter a deal name");
               return;
             }
             setLoading(true);
             try {
-              await createDeal({ title, valueCents: v, stage });
+              await createDeal({ title, valueCents: v, stage, currency: cur });
               toast.success("Deal created");
               onOpenChange(false);
               router.refresh();
@@ -87,9 +91,11 @@ export function AddDealModal({ open, onOpenChange, defaultStage }: Props) {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="deal-value">Value (USD)</Label>
+            <Label htmlFor="deal-value">Value ({normalizeWorkspaceCurrency(defaultCurrency)})</Label>
             <div className="relative">
-              <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-neutral-500">$</span>
+              <span className="absolute top-1/2 left-3 -translate-y-1/2 text-sm text-neutral-500">
+                {currencySymbol(normalizeWorkspaceCurrency(defaultCurrency))}
+              </span>
               <Input
                 id="deal-value"
                 name="value"

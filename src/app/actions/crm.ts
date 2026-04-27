@@ -1,6 +1,9 @@
 "use server";
 
+import { recordWorkspaceActivity } from "@/lib/activity/record-workspace-event";
 import { getWorkspaceContextOrThrow } from "@/lib/crm/server-workspace";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
+import { fetchWorkspaceDefaultCurrency } from "@/lib/workspace-currency";
 import { revalidatePath } from "next/cache";
 import type {
   BrandActivityKind,
@@ -15,18 +18,32 @@ import type {
 
 async function getWorkspace() {
   const c = await getWorkspaceContextOrThrow();
-  return { supabase: c.supabase, workspaceId: c.workspaceId };
+  return { supabase: c.supabase, workspaceId: c.workspaceId, userId: c.userId };
 }
 
 function rev() {
   revalidatePath("/dashboard");
+  revalidatePath("/campaigns");
   revalidatePath("/leads");
+  revalidatePath("/leads/archived");
   revalidatePath("/deals");
   revalidatePath("/brands");
   revalidatePath("/tasks");
   revalidatePath("/calendar");
   revalidatePath("/payments");
   revalidatePath("/templates");
+  revalidatePath("/settings");
+}
+
+export async function updateWorkspaceDefaultCurrency(currency: string) {
+  const { supabase, workspaceId } = await getWorkspace();
+  const code = normalizeWorkspaceCurrency(currency);
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ default_currency: code })
+    .eq("id", workspaceId);
+  if (error) throw error;
+  rev();
 }
 
 export async function createLead(input: {
@@ -37,18 +54,98 @@ export async function createLead(input: {
   status?: LeadStatus;
   notes?: string | null;
 }) {
-  const { supabase, workspaceId } = await getWorkspace();
-  const { error } = await supabase.from("leads").insert({
-    workspace_id: workspaceId,
-    name: input.name,
-    email: input.email ?? null,
-    company: input.company ?? null,
-    source: input.source ?? null,
-    status: input.status ?? "new",
-    notes: input.notes ?? null,
-  });
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("leads")
+    .insert({
+      workspace_id: workspaceId,
+      name: input.name,
+      email: input.email ?? null,
+      company: input.company ?? null,
+      source: input.source ?? null,
+      status: input.status ?? "new",
+      notes: input.notes ?? null,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "lead_created",
+    title: `New lead: ${input.name}${input.company ? ` (${input.company})` : ""}`,
+    entityType: "lead",
+    entityId: data.id as string,
+  });
   rev();
+}
+
+/** Same as createLead but returns the new row id (for automation). */
+export async function createLeadReturningId(input: {
+  name: string;
+  email?: string;
+  company?: string;
+  source?: string;
+  status?: LeadStatus;
+  notes?: string | null;
+}): Promise<string> {
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("leads")
+    .insert({
+      workspace_id: workspaceId,
+      name: input.name,
+      email: input.email ?? null,
+      company: input.company ?? null,
+      source: input.source ?? null,
+      status: input.status ?? "new",
+      notes: input.notes ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "lead_created",
+    title: `New lead: ${input.name}${input.company ? ` (${input.company})` : ""}`,
+    entityType: "lead",
+    entityId: (data as { id: string }).id,
+  });
+  rev();
+  return (data as { id: string }).id;
+}
+
+/** Same as createBrand but returns the new row id (for automation). */
+export async function createBrandReturningId(input: {
+  name: string;
+  website?: string;
+  industry?: string;
+  color?: string;
+}): Promise<string> {
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("brands")
+    .insert({
+      workspace_id: workspaceId,
+      name: input.name,
+      website: input.website ?? null,
+      industry: input.industry ?? null,
+      color: input.color ?? null,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "brand_created",
+    title: `Brand added: ${input.name}`,
+    entityType: "brand",
+    entityId: (data as { id: string }).id,
+  });
+  rev();
+  return (data as { id: string }).id;
 }
 
 export async function updateLead(
@@ -63,16 +160,91 @@ export async function updateLead(
     notes: string | null;
   }>,
 ) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("leads").update(patch).eq("id", id);
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: before } = await supabase
+    .from("leads")
+    .select("status, name")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const { error } = await supabase.from("leads").update(patch).eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
+  if (
+    patch.status !== undefined &&
+    before &&
+    (before as { status: LeadStatus }).status !== patch.status
+  ) {
+    const nm = (before as { name: string }).name;
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "lead_status_changed",
+      title: `Lead ${nm}: ${(before as { status: LeadStatus }).status} → ${patch.status}`,
+      entityType: "lead",
+      entityId: id,
+    });
+  }
   rev();
 }
 
 export async function deleteLead(id: string) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("leads").delete().eq("id", id);
+  const { supabase, workspaceId } = await getWorkspace();
+  const { error } = await supabase.from("leads").delete().eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
+  rev();
+}
+
+export async function archiveLead(id: string) {
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: row } = await supabase
+    .from("leads")
+    .select("name")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("leads")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  if (row && typeof (row as { name: string }).name === "string") {
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "lead_archived",
+      title: `Archived lead: ${(row as { name: string }).name}`,
+      entityType: "lead",
+      entityId: id,
+    });
+  }
+  rev();
+}
+
+export async function restoreLead(id: string) {
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: row } = await supabase
+    .from("leads")
+    .select("name")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("leads")
+    .update({ archived_at: null })
+    .eq("id", id)
+    .eq("workspace_id", workspaceId);
+  if (error) throw error;
+  if (row && typeof (row as { name: string }).name === "string") {
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "lead_restored",
+      title: `Restored lead: ${(row as { name: string }).name}`,
+      entityType: "lead",
+      entityId: id,
+    });
+  }
   rev();
 }
 
@@ -82,15 +254,27 @@ export async function createBrand(input: {
   industry?: string;
   color?: string;
 }) {
-  const { supabase, workspaceId } = await getWorkspace();
-  const { error } = await supabase.from("brands").insert({
-    workspace_id: workspaceId,
-    name: input.name,
-    website: input.website ?? null,
-    industry: input.industry ?? null,
-    color: input.color ?? null,
-  });
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data, error } = await supabase
+    .from("brands")
+    .insert({
+      workspace_id: workspaceId,
+      name: input.name,
+      website: input.website ?? null,
+      industry: input.industry ?? null,
+      color: input.color ?? null,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "brand_created",
+    title: `Brand added: ${input.name}`,
+    entityType: "brand",
+    entityId: data.id as string,
+  });
   rev();
 }
 
@@ -170,7 +354,7 @@ export async function createRelationshipEvent(input: {
   amountCents?: number | null;
   occurredAt?: string | null;
 }) {
-  const { supabase, workspaceId } = await getWorkspace();
+  const { supabase, workspaceId, userId } = await getWorkspace();
   const title = input.title.trim();
   if (!title) throw new Error("Title is required");
   const { error } = await supabase.from("relationship_events").insert({
@@ -183,6 +367,15 @@ export async function createRelationshipEvent(input: {
     occurred_at: input.occurredAt ?? new Date().toISOString(),
   });
   if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "brand_touchpoint",
+    title: title,
+    summary: input.kind,
+    entityType: "brand",
+    entityId: input.brandId,
+  });
   rev();
 }
 
@@ -215,8 +408,12 @@ export async function createDeal(input: {
   stage?: DealStage;
   brandId?: string | null;
   leadId?: string | null;
+  currency?: string;
 }) {
-  const { supabase, workspaceId } = await getWorkspace();
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const cur = input.currency?.trim()
+    ? normalizeWorkspaceCurrency(input.currency)
+    : await fetchWorkspaceDefaultCurrency(supabase, workspaceId);
   const { data: last } = await supabase
     .from("deals")
     .select("position")
@@ -224,17 +421,30 @@ export async function createDeal(input: {
     .eq("stage", input.stage ?? "lead")
     .order("position", { ascending: false })
     .limit(1);
-  const pos = (last?.[0]?.position ?? 0) + 1;
-  const { error } = await supabase.from("deals").insert({
-    workspace_id: workspaceId,
-    title: input.title,
-    value_cents: input.valueCents,
-    stage: input.stage ?? "lead",
-    position: pos,
-    brand_id: input.brandId ?? null,
-    lead_id: input.leadId ?? null,
-  });
+  const pos = (last?.[0]?.position ?? -10) + 10;
+  const { data, error } = await supabase
+    .from("deals")
+    .insert({
+      workspace_id: workspaceId,
+      title: input.title,
+      value_cents: input.valueCents,
+      currency: cur,
+      stage: input.stage ?? "lead",
+      position: pos,
+      brand_id: input.brandId ?? null,
+      lead_id: input.leadId ?? null,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "deal_created",
+    title: `Deal added: ${input.title}`,
+    entityType: "deal",
+    entityId: data.id as string,
+  });
   rev();
 }
 
@@ -250,9 +460,34 @@ export async function updateDeal(
     close_date: string | null;
   }>,
 ) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("deals").update(patch).eq("id", id);
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: before } = await supabase
+    .from("deals")
+    .select("stage, title")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const { error } = await supabase
+    .from("deals")
+    .update(patch)
+    .eq("id", id)
+    .eq("workspace_id", workspaceId);
   if (error) throw error;
+  if (
+    patch.stage !== undefined &&
+    before &&
+    (before as { stage: DealStage }).stage !== patch.stage
+  ) {
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "deal_stage_changed",
+      title: `Deal moved to ${patch.stage}`,
+      summary: (before as { title: string }).title,
+      entityType: "deal",
+      entityId: id,
+    });
+  }
   rev();
 }
 
@@ -265,8 +500,8 @@ export async function moveDeal(input: {
 }
 
 export async function deleteDeal(id: string) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("deals").delete().eq("id", id);
+  const { supabase, workspaceId } = await getWorkspace();
+  const { error } = await supabase.from("deals").delete().eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
   rev();
 }
@@ -313,9 +548,31 @@ export async function updateTask(
     reminder_at: string | null;
   }>,
 ) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("tasks").update(patch).eq("id", id);
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: before } = await supabase
+    .from("tasks")
+    .select("completed, title, workspace_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (before && (before as { workspace_id: string }).workspace_id !== workspaceId) {
+    throw new Error("Task not found");
+  }
+  const { error } = await supabase.from("tasks").update(patch).eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
+  if (
+    patch.completed === true &&
+    before &&
+    !(before as { completed: boolean }).completed
+  ) {
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "task_completed",
+      title: `Task done: ${(before as { title: string }).title}`,
+      entityType: "task",
+      entityId: id,
+    });
+  }
   rev();
 }
 
@@ -333,18 +590,35 @@ export async function createPayment(input: {
   dueDate?: string | null;
   dealId?: string | null;
   description?: string | null;
+  currency?: string;
 }) {
-  const { supabase, workspaceId } = await getWorkspace();
-  const { error } = await supabase.from("payments").insert({
-    workspace_id: workspaceId,
-    client_name: input.clientName,
-    amount_cents: input.amountCents,
-    status: input.status ?? "pending",
-    due_date: input.dueDate ?? null,
-    deal_id: input.dealId ?? null,
-    description: input.description ?? null,
-  });
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const cur = input.currency?.trim()
+    ? normalizeWorkspaceCurrency(input.currency)
+    : await fetchWorkspaceDefaultCurrency(supabase, workspaceId);
+  const { data, error } = await supabase
+    .from("payments")
+    .insert({
+      workspace_id: workspaceId,
+      client_name: input.clientName,
+      amount_cents: input.amountCents,
+      currency: cur,
+      status: input.status ?? "pending",
+      due_date: input.dueDate ?? null,
+      deal_id: input.dealId ?? null,
+      description: input.description ?? null,
+    })
+    .select("id")
+    .single();
   if (error) throw error;
+  await recordWorkspaceActivity(supabase, {
+    workspaceId,
+    actorId: userId,
+    eventType: "payment_created",
+    title: `Invoice: ${input.clientName}`,
+    entityType: "payment",
+    entityId: data.id as string,
+  });
   rev();
 }
 
@@ -358,9 +632,29 @@ export async function updatePayment(
     paid_at: string | null;
   }>,
 ) {
-  const { supabase } = await getWorkspace();
-  const { error } = await supabase.from("payments").update(patch).eq("id", id);
+  const { supabase, workspaceId, userId } = await getWorkspace();
+  const { data: before } = await supabase
+    .from("payments")
+    .select("status, client_name")
+    .eq("id", id)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+  const { error } = await supabase.from("payments").update(patch).eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
+  if (
+    patch.status === "paid" &&
+    before &&
+    (before as { status: PaymentStatus }).status !== "paid"
+  ) {
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId: userId,
+      eventType: "payment_received",
+      title: `Payment received: ${(before as { client_name: string }).client_name}`,
+      entityType: "payment",
+      entityId: id,
+    });
+  }
   rev();
 }
 
