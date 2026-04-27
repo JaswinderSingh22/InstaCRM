@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// const nav = [
-//   { href: "/help", label: "Help" },
-//   { href: "/privacy", label: "Privacy" },
-//   { href: "/terms", label: "Terms" },
-// ] as const;
+const nav = [
+  { href: "/help", label: "Help" },
+  { href: "/privacy", label: "Privacy" },
+  { href: "/terms", label: "Terms" },
+] as const;
 
 type Props = {
   title: string;
