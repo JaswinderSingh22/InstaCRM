@@ -1,23 +1,29 @@
 import {
   Building2,
+  Calendar,
   CreditCard,
-  FileText,
   LayoutDashboard,
-  ListTodo,
   Settings,
   Sparkles,
-  Users,
   SquareKanban,
+  Users,
 } from "lucide-react";
 
+/** Primary — matches new dashboard design */
 export const mainNav = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/leads", label: "Leads", icon: Users },
+  { href: "/leads", label: "Creators", icon: Users },
   { href: "/deals", label: "Deals", icon: SquareKanban },
   { href: "/brands", label: "Brands", icon: Building2 },
-  { href: "/tasks", label: "Tasks", icon: ListTodo },
+  { href: "/calendar", label: "Calendar", icon: Calendar },
+] as const;
+
+/** Rest of the app, shown below the fold in the sidebar */
+export const moreNav = [
   { href: "/payments", label: "Payments", icon: CreditCard },
-  { href: "/templates", label: "Templates", icon: FileText },
-  { href: "/settings", label: "Settings", icon: Settings },
   { href: "/billing", label: "Billing", icon: Sparkles },
+] as const;
+
+export const bottomNav = [
+  { href: "/settings", label: "Settings", icon: Settings },
 ] as const;

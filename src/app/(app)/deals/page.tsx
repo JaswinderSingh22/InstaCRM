@@ -1,6 +1,6 @@
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { DealsKanban } from "@/components/deals/deals-kanban";
+import { DealsView } from "@/components/deals/deals-view";
 import { PageFade } from "@/components/layout/page-fade";
 import type { Deal } from "@/types/database";
 
@@ -20,11 +20,7 @@ export default async function DealsPage() {
   const key = initial.map((d) => `${d.id}-${d.stage}-${d.position}`).join("|");
   return (
     <PageFade>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Deals</h1>
-        <p className="text-sm text-muted-foreground">Drag between stages</p>
-      </div>
-      <DealsKanban key={key} initial={initial} />
+      <DealsView key={key} initial={initial} />
     </PageFade>
   );
 }

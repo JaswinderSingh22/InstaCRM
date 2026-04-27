@@ -1,23 +1,21 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { getWorkspaceContextOrThrow } from "@/lib/crm/server-workspace";
 import { revalidatePath } from "next/cache";
-import type { LeadStatus, DealStage, PaymentStatus, TaskRelated, TemplateType } from "@/types/database";
+import type {
+  BrandActivityKind,
+  BrandContactStatus,
+  LeadStatus,
+  DealStage,
+  PaymentStatus,
+  Task,
+  TaskRelated,
+  TemplateType,
+} from "@/types/database";
 
 async function getWorkspace() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Unauthorized");
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("default_workspace_id")
-    .eq("id", user.id)
-    .single();
-  const wid = profile?.default_workspace_id;
-  if (!wid) throw new Error("No workspace");
-  return { supabase, workspaceId: wid };
+  const c = await getWorkspaceContextOrThrow();
+  return { supabase: c.supabase, workspaceId: c.workspaceId };
 }
 
 function rev() {
@@ -26,6 +24,7 @@ function rev() {
   revalidatePath("/deals");
   revalidatePath("/brands");
   revalidatePath("/tasks");
+  revalidatePath("/calendar");
   revalidatePath("/payments");
   revalidatePath("/templates");
 }
@@ -36,6 +35,7 @@ export async function createLead(input: {
   company?: string;
   source?: string;
   status?: LeadStatus;
+  notes?: string | null;
 }) {
   const { supabase, workspaceId } = await getWorkspace();
   const { error } = await supabase.from("leads").insert({
@@ -45,6 +45,7 @@ export async function createLead(input: {
     company: input.company ?? null,
     source: input.source ?? null,
     status: input.status ?? "new",
+    notes: input.notes ?? null,
   });
   if (error) throw error;
   rev();
@@ -116,6 +117,98 @@ export async function deleteBrand(id: string) {
   rev();
 }
 
+export async function createBrandContact(input: {
+  brandId: string;
+  name: string;
+  email?: string | null;
+  role?: string | null;
+  status?: BrandContactStatus;
+}) {
+  const { supabase, workspaceId } = await getWorkspace();
+  const name = input.name.trim();
+  if (!name) throw new Error("Name is required");
+  const { error } = await supabase.from("partner_contacts").insert({
+    workspace_id: workspaceId,
+    brand_id: input.brandId,
+    name,
+    email: input.email?.trim() ? input.email.trim() : null,
+    role: input.role?.trim() ? input.role.trim() : null,
+    status: input.status ?? "active",
+  });
+  if (error) throw error;
+  rev();
+}
+
+export async function updateBrandContact(
+  id: string,
+  patch: Partial<{
+    name: string;
+    email: string | null;
+    role: string | null;
+    status: BrandContactStatus;
+    last_contacted_at: string | null;
+  }>,
+) {
+  const { supabase } = await getWorkspace();
+  const { error } = await supabase.from("partner_contacts").update(patch).eq("id", id);
+  if (error) throw error;
+  rev();
+}
+
+export async function deleteBrandContact(id: string) {
+  const { supabase } = await getWorkspace();
+  const { error } = await supabase.from("partner_contacts").delete().eq("id", id);
+  if (error) throw error;
+  rev();
+}
+
+export async function createRelationshipEvent(input: {
+  brandId: string;
+  kind: BrandActivityKind;
+  title: string;
+  body?: string | null;
+  amountCents?: number | null;
+  occurredAt?: string | null;
+}) {
+  const { supabase, workspaceId } = await getWorkspace();
+  const title = input.title.trim();
+  if (!title) throw new Error("Title is required");
+  const { error } = await supabase.from("relationship_events").insert({
+    workspace_id: workspaceId,
+    brand_id: input.brandId,
+    kind: input.kind,
+    title,
+    body: input.body?.trim() ? input.body.trim() : null,
+    amount_cents: input.amountCents ?? null,
+    occurred_at: input.occurredAt ?? new Date().toISOString(),
+  });
+  if (error) throw error;
+  rev();
+}
+
+export async function updateRelationshipEvent(
+  id: string,
+  patch: Partial<{
+    kind: BrandActivityKind;
+    title: string;
+    body: string | null;
+    amount_cents: number | null;
+    occurred_at: string;
+  }>,
+) {
+  const { supabase } = await getWorkspace();
+  const { error } = await supabase.from("relationship_events").update(patch).eq("id", id);
+  if (error) throw error;
+  rev();
+}
+
+export async function deleteRelationshipEvent(id: string) {
+  const { supabase } = await getWorkspace();
+  const { error } = await supabase.from("relationship_events").delete().eq("id", id);
+  if (error) throw error;
+  rev();
+}
+
 export async function createDeal(input: {
   title: string;
   valueCents: number;
@@ -182,20 +275,33 @@ export async function createTask(input: {
   title: string;
   dueAt?: string | null;
   reminderAt?: string | null;
+  description?: string | null;
   relatedType?: TaskRelated;
   relatedId?: string | null;
-}) {
+}): Promise<{ task: Task }> {
   const { supabase, workspaceId } = await getWorkspace();
-  const { error } = await supabase.from("tasks").insert({
-    workspace_id: workspaceId,
-    title: input.title,
-    due_at: input.dueAt ?? null,
-    reminder_at: input.reminderAt ?? null,
-    related_type: input.relatedType ?? "none",
-    related_id: input.relatedId ?? null,
-  });
+  const title = input.title.trim();
+  if (!title) {
+    throw new Error("Title is required");
+  }
+  const relatedType: TaskRelated | null =
+    input.relatedType && input.relatedType !== "none" ? input.relatedType : null;
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert({
+      workspace_id: workspaceId,
+      title,
+      description: input.description?.trim() ? input.description.trim() : null,
+      due_at: input.dueAt ?? null,
+      reminder_at: input.reminderAt ?? null,
+      related_type: relatedType,
+      related_id: input.relatedId ?? null,
+    })
+    .select("*")
+    .single();
   if (error) throw error;
   rev();
+  return { task: data as Task };
 }
 
 export async function updateTask(
@@ -300,7 +406,14 @@ export async function deleteTemplate(id: string) {
 
 export async function updateUserSettings(
   userId: string,
-  patch: { email_digest?: boolean; time_zone?: string | null; week_starts_on?: number },
+  patch: {
+    email_digest?: boolean;
+    time_zone?: string | null;
+    week_starts_on?: number;
+    campaign_alerts?: boolean;
+    system_news?: boolean;
+    locale?: string | null;
+  },
 ) {
   const { supabase } = await getWorkspace();
   const {
@@ -315,17 +428,34 @@ export async function updateUserSettings(
   revalidatePath("/settings");
 }
 
-export async function updateProfile(input: { fullName: string }) {
+export async function updateProfile(input: {
+  fullName: string;
+  instagramHandle?: string | null;
+  bio?: string | null;
+  workEmail?: string | null;
+  avatarUrl?: string | null;
+}) {
   const { supabase } = await getWorkspace();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
-  const { error } = await supabase
-    .from("profiles")
-    .update({ full_name: input.fullName })
-    .eq("id", user.id);
+  const patch: Record<string, unknown> = { full_name: input.fullName };
+  if (input.instagramHandle !== undefined) {
+    patch.instagram_handle = input.instagramHandle?.trim() || null;
+  }
+  if (input.bio !== undefined) {
+    patch.bio = input.bio?.trim() || null;
+  }
+  if (input.workEmail !== undefined) {
+    patch.work_email = input.workEmail?.trim() || null;
+  }
+  if (input.avatarUrl !== undefined) {
+    patch.avatar_url = input.avatarUrl;
+  }
+  const { error } = await supabase.from("profiles").update(patch).eq("id", user.id);
   if (error) throw error;
   revalidatePath("/settings");
   revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
 }

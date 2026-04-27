@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/layout/app-shell";
 import { getSessionAndWorkspace } from "@/lib/auth/workspace";
+import { redirect } from "next/navigation";
 
 export default async function AppGroupLayout({
   children,
@@ -7,15 +8,8 @@ export default async function AppGroupLayout({
   children: React.ReactNode;
 }) {
   const ctx = await getSessionAndWorkspace();
-  if (!ctx.workspaceId) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center p-6">
-        <p className="text-sm text-muted-foreground">
-          No workspace is linked to your account. If you just signed up, refresh in a
-          moment, or re-run the database migration in Supabase.
-        </p>
-      </div>
-    );
+  if (!ctx.profile.onboarding_completed_at) {
+    redirect("/onboarding");
   }
   return (
     <AppShell user={ctx.user} profile={ctx.profile}>

@@ -1,30 +1,29 @@
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
 import { PageFade } from "@/components/layout/page-fade";
-import { BillingActions } from "@/components/billing/billing-actions";
+import { BillingPageView } from "@/components/billing/billing-page-view";
 
-export const metadata = { title: "Billing" };
+export const metadata = { title: "Billing & Subscriptions" };
 
 export default async function BillingPage() {
   const { workspaceId } = await requireWorkspace();
   const supabase = await createClient();
-  const { data: ws, error } = await supabase
-    .from("workspaces")
-    .select("plan, subscription_status")
-    .eq("id", workspaceId)
-    .single();
+
+  const [{ data: ws, error }, { count: leadCount }] = await Promise.all([
+    supabase.from("workspaces").select("plan, subscription_status").eq("id", workspaceId).single(),
+    supabase.from("leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+  ]);
+
   if (error || !ws) {
     return <p className="text-destructive">Could not load workspace</p>;
   }
+
   return (
     <PageFade>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight">Billing</h1>
-        <p className="text-sm text-muted-foreground">Stripe + subscription</p>
-      </div>
-      <BillingActions
+      <BillingPageView
         plan={ws.plan as string | null}
-        status={ws.subscription_status as string}
+        subscriptionStatus={ws.subscription_status as string}
+        leadCount={leadCount ?? 0}
       />
     </PageFade>
   );

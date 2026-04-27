@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "@/components/auth/login-form";
+import { AuthSplitShell } from "@/components/auth/auth-split-shell";
+
+export const metadata = { title: "Log in" };
 
 type Props = { searchParams: Promise<{ next?: string; error?: string }> };
 
@@ -12,29 +15,36 @@ export default async function LoginPage({ searchParams }: Props) {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    redirect(p.next || "/dashboard");
+    redirect(p.next || "/onboarding");
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,hsl(262_45%_35%/0.12),transparent)] px-4">
-      <div className="w-full max-w-sm space-y-6">
+    <AuthSplitShell variant="login">
+      <div className="space-y-8">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Sign in</h1>
-          <p className="text-sm text-muted-foreground">
-            Use email or continue with Google
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 md:text-3xl">
+            Welcome Back
+          </h1>
+          <p className="mt-2 text-sm text-[#777681]">
+            Log in to manage your campaigns and leads.
           </p>
         </div>
         {p.error ? (
-          <p className="text-sm text-destructive">Authentication failed. Try again.</p>
+          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+            {p.error}
+          </p>
         ) : null}
         <LoginForm nextPath={p.next} />
-        <p className="text-center text-sm text-muted-foreground">
-          New here?{" "}
-          <Link className="text-primary underline-offset-4 hover:underline" href="/signup">
-            Create an account
+        <p className="text-center text-sm text-[#777681]">
+          Don&apos;t have an account?{" "}
+          <Link
+            className="font-semibold text-[#4F46E5] hover:underline"
+            href="/signup"
+          >
+            Sign Up for Free
           </Link>
         </p>
       </div>
-    </div>
+    </AuthSplitShell>
   );
 }

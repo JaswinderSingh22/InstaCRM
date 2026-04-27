@@ -1,12 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
 import { type NextRequest, NextResponse } from "next/server";
 
+const supabaseFetch: typeof fetch = (input, init) =>
+  fetch(input, { ...init, cache: "no-store" });
+
 const protectedPaths = new Set([
   "/dashboard",
   "/leads",
   "/deals",
   "/brands",
   "/tasks",
+  "/calendar",
   "/payments",
   "/templates",
   "/settings",
@@ -20,6 +24,7 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      global: { fetch: supabaseFetch },
       cookies: {
         getAll() {
           return request.cookies.getAll();
@@ -40,8 +45,16 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const pathname = request.nextUrl.pathname;
 
-  if (protectedPaths.has(request.nextUrl.pathname) && !user) {
+  if (pathname === "/onboarding" && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", "/onboarding");
+    return NextResponse.redirect(url);
+  }
+
+  if (protectedPaths.has(pathname) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", request.nextUrl.pathname);

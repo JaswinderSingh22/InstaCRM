@@ -30,6 +30,35 @@ export type Brand = {
   updated_at: string;
 };
 
+export type BrandContactStatus = "active" | "pending" | "inactive";
+export type BrandActivityKind = "email" | "payment" | "contract" | "meeting" | "note";
+
+export type BrandContact = {
+  id: string;
+  workspace_id: string;
+  brand_id: string;
+  name: string;
+  email: string | null;
+  role: string | null;
+  status: BrandContactStatus;
+  last_contacted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type BrandActivity = {
+  id: string;
+  workspace_id: string;
+  brand_id: string;
+  kind: BrandActivityKind;
+  title: string;
+  body: string | null;
+  amount_cents: number | null;
+  occurred_at: string;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Deal = {
   id: string;
   workspace_id: string;
@@ -89,6 +118,10 @@ export type UserSettings = {
   email_digest: boolean;
   week_starts_on: number;
   time_zone: string | null;
+  /** Present after migration `20260428150500_profile_creator_fields`. */
+  campaign_alerts?: boolean;
+  system_news?: boolean;
+  locale?: string | null;
   created_at: string;
   updated_at: string;
 };

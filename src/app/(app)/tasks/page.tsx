@@ -4,6 +4,8 @@ import { TaskForm, TaskList } from "@/components/tasks/task-form-list";
 import { PageFade } from "@/components/layout/page-fade";
 import type { Task } from "@/types/database";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = { title: "Tasks" };
 
 export default async function TasksPage() {

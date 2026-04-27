@@ -1,37 +1,42 @@
+import { Suspense } from "react";
 import { requireWorkspace } from "@/lib/auth/workspace";
-import { createClient } from "@/lib/supabase/server";
-import { BrandForm, BrandCards } from "@/components/brands/brand-form";
-import { PageFade } from "@/components/layout/page-fade";
-import type { Brand } from "@/types/database";
+import { getBrandsPageData } from "@/lib/data/brands-page";
+import { BrandsPartnershipsView } from "@/components/brands/brands-partnerships-view";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 export const metadata = { title: "Brands" };
 
-export default async function BrandsPage() {
-  const { workspaceId } = await requireWorkspace();
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("brands")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("name");
-  if (error) {
-    return <p className="text-destructive">Could not load brands</p>;
-  }
-  const brands = (data ?? []) as Brand[];
+type Props = { searchParams: Promise<{ q?: string }> };
+
+function Loading() {
   return (
-    <PageFade>
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Brands</h1>
-          <p className="text-sm text-muted-foreground">Accounts & verticals you sell into</p>
-        </div>
-        <BrandForm />
+    <div className="mx-auto max-w-6xl animate-pulse space-y-4 p-1">
+      <div className="h-8 w-72 rounded bg-neutral-200" />
+      <div className="grid grid-cols-3 gap-3">
+        <div className="h-48 rounded-2xl bg-neutral-100" />
+        <div className="h-48 rounded-2xl bg-neutral-100" />
+        <div className="h-48 rounded-2xl bg-neutral-100" />
       </div>
-      {brands.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No brands yet</p>
-      ) : (
-        <BrandCards brands={brands} />
-      )}
-    </PageFade>
+    </div>
+  );
+}
+
+export default async function BrandsPage({ searchParams }: Props) {
+  const p = await searchParams;
+  const initialQuery = typeof p.q === "string" ? p.q : "";
+  const { workspaceId } = await requireWorkspace();
+  const data = await getBrandsPageData(workspaceId);
+
+  return (
+    <Suspense fallback={<Loading />}>
+      <BrandsPartnershipsView
+        brandRows={data.brands}
+        contacts={data.contacts}
+        activities={data.activities}
+        brandNameById={data.brandNameById}
+        initialQuery={initialQuery}
+      />
+    </Suspense>
   );
 }

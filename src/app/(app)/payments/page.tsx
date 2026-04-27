@@ -1,37 +1,47 @@
+import { Suspense } from "react";
 import { requireWorkspace } from "@/lib/auth/workspace";
 import { createClient } from "@/lib/supabase/server";
-import { PaymentForm, PaymentsTable } from "@/components/payments/payment-section";
-import { PageFade } from "@/components/layout/page-fade";
+import { PaymentsFinanceView } from "@/components/payments/payments-finance-view";
 import type { Payment } from "@/types/database";
 
-export const metadata = { title: "Payments" };
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const metadata = { title: "Payments & Invoicing" };
 
-export default async function PaymentsPage() {
+type Props = { searchParams: Promise<{ q?: string }> };
+
+function FinanceLoading() {
+  return (
+    <div className="mx-auto max-w-6xl animate-pulse space-y-4 p-1">
+      <div className="h-8 w-64 rounded bg-neutral-200" />
+      <div className="h-24 grid grid-cols-3 gap-3">
+        <div className="h-full rounded-2xl bg-neutral-100" />
+        <div className="h-full rounded-2xl bg-neutral-100" />
+        <div className="h-full rounded-2xl bg-neutral-100" />
+      </div>
+      <div className="h-64 rounded-2xl bg-neutral-100" />
+    </div>
+  );
+}
+
+export default async function PaymentsPage({ searchParams }: Props) {
+  const p = await searchParams;
+  const initialQuery = typeof p.q === "string" ? p.q : "";
   const { workspaceId } = await requireWorkspace();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("payments")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false });
+    .order("due_date", { ascending: true, nullsFirst: false });
   if (error) {
-    return <p className="text-destructive">Could not load</p>;
+    return <p className="text-destructive">Could not load payments</p>;
   }
   const rows = (data ?? []) as Payment[];
+
   return (
-    <PageFade>
-      <div className="mb-6 flex items-end justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
-          <p className="text-sm text-muted-foreground">Revenue and receivables</p>
-        </div>
-        <PaymentForm />
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No payment rows</p>
-      ) : (
-        <PaymentsTable rows={rows} />
-      )}
-    </PageFade>
+    <Suspense fallback={<FinanceLoading />}>
+      <PaymentsFinanceView rows={rows} initialQuery={initialQuery} />
+    </Suspense>
   );
 }

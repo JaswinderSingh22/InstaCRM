@@ -2,52 +2,103 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
-import { mainNav } from "@/config/nav";
+import { HelpCircle } from "lucide-react";
+import { mainNav, moreNav, bottomNav } from "@/config/nav";
 import { cn } from "@/lib/utils";
-import { Sparkles } from "lucide-react";
+
+function isActive(pathname: string, href: string) {
+  if (href === "/dashboard") return pathname === "/dashboard";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-60 flex-col border-r border-border/60 bg-sidebar/80 backdrop-blur-xl">
-      <div className="flex h-14 items-center gap-2 border-b border-border/60 px-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10">
-          <Sparkles className="size-4 text-primary" />
-        </div>
-        <div>
-          <p className="text-sm font-semibold tracking-tight">InstaCRM</p>
-          <p className="text-[10px] text-muted-foreground">Revenue OS</p>
-        </div>
+    <aside className="fixed left-0 top-0 z-40 flex h-dvh w-60 flex-col border-r border-neutral-200/80 bg-white">
+      <div className="border-b border-neutral-100 px-4 py-4">
+        <p className="text-base font-bold tracking-tight text-[#4F46E5]">InstaCRM</p>
+        <p className="text-[10px] font-semibold tracking-wide text-neutral-500">Creator operations</p>
       </div>
-      <nav className="flex-1 space-y-0.5 p-2">
+
+      <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {mainNav.map((item) => {
-          const active =
-            item.href === "/dashboard"
-              ? pathname === "/dashboard"
-              : pathname.startsWith(item.href);
+          const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="block">
-              <motion.div
-                whileTap={{ scale: 0.98 }}
+            <Link key={`${item.href}-${item.label}`} href={item.href} className="block">
+              <div
                 className={cn(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium transition-colors",
+                  "relative flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                   active
-                    ? "bg-primary/10 text-foreground"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground",
+                    ? "bg-indigo-50 text-[#4F46E5]"
+                    : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900",
                 )}
               >
-                <Icon
-                  className={cn("size-4 shrink-0", active && "text-primary")}
-                />
+                {active ? (
+                  <span className="absolute top-1.5 bottom-1.5 left-0 w-0.5 rounded-full bg-[#4F46E5]" />
+                ) : null}
+                <Icon className={cn("size-4 shrink-0", active && "text-[#4F46E5]")} />
                 {item.label}
-              </motion.div>
+              </div>
             </Link>
           );
         })}
+
+        <div className="my-3 border-t border-neutral-100 pt-2">
+          <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+            More
+          </p>
+          {moreNav.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className="block">
+                <div
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-indigo-50 text-[#4F46E5]"
+                      : "text-neutral-600 hover:bg-neutral-50",
+                  )}
+                >
+                  <Icon className="size-3.5 shrink-0" />
+                  {item.label}
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </nav>
+
+      <div className="border-t border-neutral-100 p-3">
+        <div className="space-y-0.5">
+          {bottomNav.map((item) => {
+            const active = isActive(pathname, item.href);
+            const Icon = item.icon;
+            return (
+              <Link key={item.href} href={item.href} className="block">
+                <div
+                  className={cn(
+                    "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-neutral-600 hover:bg-neutral-50",
+                    active && "text-[#4F46E5]",
+                  )}
+                >
+                  <Icon className="size-4" />
+                  {item.label}
+                </div>
+              </Link>
+            );
+          })}
+          <Link
+            href="/help"
+            className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+          >
+            <HelpCircle className="size-4" />
+            Help
+          </Link>
+        </div>
+      </div>
     </aside>
   );
 }

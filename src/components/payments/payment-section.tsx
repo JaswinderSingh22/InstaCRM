@@ -23,14 +23,19 @@ export function PaymentForm() {
   const router = useRouter();
   if (!open) {
     return (
-      <Button size="sm" onClick={() => setOpen(true)}>
-        Log payment
+      <Button
+        id="create-invoice-btn"
+        size="sm"
+        onClick={() => setOpen(true)}
+        className="h-9 gap-1.5 rounded-lg border-0 bg-gradient-to-r from-[#4F46E5] to-indigo-600 font-semibold text-white shadow-sm hover:from-[#4338ca] hover:to-indigo-600"
+      >
+        + Create invoice
       </Button>
     );
   }
   return (
     <form
-      className="mb-4 max-w-md space-y-2 rounded-md border border-border/60 p-3"
+      className="mb-4 max-w-md space-y-2 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm"
       onSubmit={async (e) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -53,8 +58,8 @@ export function PaymentForm() {
       }}
     >
       <div className="space-y-1.5">
-        <Label>Client *</Label>
-        <Input name="client" required />
+        <Label>Brand / client *</Label>
+        <Input name="client" required placeholder="e.g. GlowSkin Organics" />
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
@@ -80,8 +85,8 @@ export function PaymentForm() {
         </select>
       </div>
       <div>
-        <Label>Description</Label>
-        <Input name="desc" />
+        <Label>Deal / campaign</Label>
+        <Input name="desc" placeholder="e.g. Summer Skincare Series (3 Reels)" />
       </div>
       <div className="flex gap-2">
         <Button type="submit" size="sm">

@@ -16,7 +16,7 @@ export function TaskForm() {
   const router = useRouter();
   if (!open) {
     return (
-      <Button size="sm" onClick={() => setOpen(true)}>
+      <Button id="task-manager-add" size="sm" onClick={() => setOpen(true)}>
         Add task
       </Button>
     );
