@@ -7,11 +7,11 @@ import { GradientText } from "@/components/marketing/gradient-text";
 import { HeroMockup } from "@/components/marketing/hero-mockup";
 import { LandingFooter } from "@/components/marketing/landing-footer";
 import { LandingNav } from "@/components/marketing/landing-nav";
-import { PillBadge } from "@/components/marketing/pill-badge";
+// import { PillBadge } from "@/components/marketing/pill-badge";
 import { PricingCard } from "@/components/marketing/pricing-card";
 import { SectionHeader } from "@/components/marketing/section-header";
 import { TestimonialCard } from "@/components/marketing/testimonial-card";
-import { StarRating } from "@/components/marketing/star-rating";
+// import { StarRating } from "@/components/marketing/star-rating";
 import { cn } from "@/lib/utils";
 import { PRICING, formatPlanPrice } from "@/lib/pricing-plans";
 
@@ -30,11 +30,11 @@ export function LandingPageView() {
           />
           <div className="pointer-events-none absolute top-0 right-0 h-100 w-100 bg-rose-100/30 blur-3xl" />
           <div className="relative mx-auto max-w-4xl text-center">
-            <div className="flex justify-center">
+            {/* <div className="flex justify-center">
               <PillBadge>
                 <span className="text-[10px]">●</span> V2.0 now live for creators
               </PillBadge>
-            </div>
+            </div> */}
             <h1 className="mt-6 text-4xl font-bold leading-tight tracking-tight text-balance sm:text-5xl md:text-6xl">
               Close More Brand Deals. Track Leads.{" "}
               <GradientText as="span" className="block sm:inline">
@@ -56,7 +56,7 @@ export function LandingPageView() {
                 Start Free Trial
               </Link>
               <Link
-                href="mailto:hello@instacrm.app"
+                href="mailto:jaswindersingh@iitdalumni.com"
                 className={cn(
                   buttonVariants({ variant: "outline", size: "lg" }),
                   "h-12 rounded-xl border-neutral-200 bg-white px-8 text-base font-semibold",
@@ -174,7 +174,7 @@ export function LandingPageView() {
               title="Ready to take your creator business to the next level?"
               description="Join 10,000+ top-tier creators who use InstaCRM to run their empire."
               primaryCta={{ label: "Get Started for Free", href: "/signup" }}
-              secondaryCta={{ label: "Talk to an Expert", href: "mailto:hello@instacrm.app" }}
+              secondaryCta={{ label: "Talk to an Expert", href: "mailto:jaswindersingh@iitdalumni.com" }}
             />
           </div>
         </section>

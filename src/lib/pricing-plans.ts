@@ -47,7 +47,7 @@ export const PRICING = {
       "Multi-creator management",
       "Commission-friendly workflows",
     ],
-    landing: { cta: "Contact sales", href: "mailto:hello@instacrm.app" as const },
+    landing: { cta: "Contact sales", href: "mailto:jaswindersingh@iitdalumni.com" as const },
   },
 } as const;
 
