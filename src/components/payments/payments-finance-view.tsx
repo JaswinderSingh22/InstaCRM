@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -19,7 +19,8 @@ import {
   CheckCircle2,
   Clock,
   Download,
-  MoreVertical,
+  Loader2,
+  Pencil,
 } from "lucide-react";
 import {
   Bar,
@@ -35,7 +36,18 @@ import { updatePayment } from "@/app/actions/crm";
 import { formatMajorUnitsAmount, formatMajorUnitsCompact, formatMoney } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { Payment, PaymentStatus } from "@/types/database";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PageFade } from "@/components/layout/page-fade";
 import { PaymentForm } from "@/components/payments/payment-section";
 
@@ -155,11 +167,150 @@ function exportCsv(rows: Payment[]) {
   URL.revokeObjectURL(a.href);
 }
 
+function EditInvoiceDialog({
+  payment,
+  open,
+  onOpenChange,
+  defaultWorkspaceCurrency,
+}: {
+  payment: Payment | null;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  defaultWorkspaceCurrency: string;
+}) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [clientName, setClientName] = useState("");
+  const [amountMajor, setAmountMajor] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<PaymentStatus>("pending");
+
+  useEffect(() => {
+    if (!payment || !open) return;
+    setClientName(payment.client_name);
+    setAmountMajor((payment.amount_cents / 100).toFixed(2));
+    setDueDate(payment.due_date ?? "");
+    setDescription(payment.description ?? "");
+    setStatus(payment.status);
+  }, [payment, open]);
+
+  const curCode = payment?.currency?.trim().toUpperCase() ?? defaultWorkspaceCurrency;
+
+  if (!payment) return null;
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!payment || payment.status === "paid") return;
+    const dollars = amountMajor.replace(/[$,\s]/g, "");
+    const cents = Math.max(0, Math.round((Number(dollars) || 0) * 100));
+    setLoading(true);
+    try {
+      await updatePayment(payment.id, {
+        client_name: clientName.trim(),
+        amount_cents: cents,
+        due_date: dueDate ? dueDate : null,
+        description: description.trim() ? description.trim() : null,
+        status,
+        paid_at: status === "paid" ? new Date().toISOString() : null,
+      });
+      toast.success("Invoice updated");
+      onOpenChange(false);
+      router.refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md border-neutral-200 bg-white" showCloseButton>
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold text-neutral-900">Edit invoice</DialogTitle>
+          <DialogDescription>
+            Changes apply to this workspace invoice. Currency: {curCode}.
+          </DialogDescription>
+        </DialogHeader>
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="inv-client">Brand / client</Label>
+            <Input
+              id="inv-client"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              required
+              className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+            />
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="inv-amt">Amount ({curCode})</Label>
+              <Input
+                id="inv-amt"
+                value={amountMajor}
+                onChange={(e) => setAmountMajor(e.target.value)}
+                inputMode="decimal"
+                required
+                className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="inv-due">Due date</Label>
+              <Input
+                id="inv-due"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inv-desc">Deal / campaign</Label>
+            <Textarea
+              id="inv-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="rounded-lg border-neutral-200 bg-[#F8F9FC]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="inv-st">Status</Label>
+            <select
+              id="inv-st"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as PaymentStatus)}
+              className="h-10 w-full rounded-lg border border-neutral-200 bg-[#F8F9FC] px-3 text-sm"
+            >
+              <option value="pending">pending</option>
+              <option value="paid">paid</option>
+              <option value="overdue">overdue</option>
+              <option value="canceled">canceled</option>
+            </select>
+          </div>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={loading} className="font-semibold">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultCurrency }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const q = searchParams.get("q") ?? initialQuery;
   const [page, setPage] = useState(0);
+  const [editPayment, setEditPayment] = useState<Payment | null>(null);
 
   const filtered = useMemo(() => filterBySearch(rows, q), [rows, q]);
   const recent = useMemo(() => {
@@ -203,7 +354,9 @@ export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultC
         ? parseISO(p.paid_at)
         : p.due_date
           ? parseISO(p.due_date)
-          : null;
+          : p.updated_at
+            ? parseISO(p.updated_at)
+            : null;
       if (!t) continue;
       const key = format(t, "yyyy-MM");
       byMonth.set(key, (byMonth.get(key) ?? 0) + p.amount_cents);
@@ -381,22 +534,34 @@ export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultC
                           <StatusBadge status={p.status} />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {p.status === "paid" ? (
-                            <span
-                              className="inline-flex size-7 items-center justify-center rounded-full bg-teal-50 text-teal-700"
-                              aria-label="Paid"
-                            >
-                              <Check className="size-4" />
-                            </span>
-                          ) : p.status === "canceled" ? null : (
-                            <button
-                              type="button"
-                              onClick={() => onMarkPaid(p.id)}
-                              className="text-xs font-semibold text-[#4F46E5] hover:underline"
-                            >
-                              Mark paid
-                            </button>
-                          )}
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            {p.status !== "paid" && p.status !== "canceled" ? (
+                              <button
+                                type="button"
+                                onClick={() => setEditPayment(p)}
+                                className="inline-flex items-center gap-1 text-xs font-semibold text-neutral-600 hover:text-[#4F46E5]"
+                              >
+                                <Pencil className="size-3" />
+                                Edit
+                              </button>
+                            ) : null}
+                            {p.status === "paid" ? (
+                              <span
+                                className="inline-flex size-7 items-center justify-center rounded-full bg-teal-50 text-teal-700"
+                                aria-label="Paid"
+                              >
+                                <Check className="size-4" />
+                              </span>
+                            ) : p.status === "canceled" ? null : (
+                              <button
+                                type="button"
+                                onClick={() => onMarkPaid(p.id)}
+                                className="text-xs font-semibold text-[#4F46E5] hover:underline"
+                              >
+                                Mark paid
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -435,7 +600,7 @@ export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultC
           <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-bold text-neutral-900">Payout trends</h2>
             <p className="text-xs text-neutral-500">Paid volume by month (last 6 months)</p>
-            <div className="mt-4 h-52 w-full">
+            <div className="mt-4 h-[13rem] min-h-[13rem] w-full min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
                   <XAxis
@@ -469,74 +634,24 @@ export function PaymentsFinanceView({ rows, initialQuery = "", workspaceDefaultC
               </ResponsiveContainer>
             </div>
           </div>
-          <div className="rounded-2xl border border-neutral-200/80 bg-white p-4 shadow-sm">
-            <div className="mb-1 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-neutral-900">Payout accounts</h2>
-              <button
-                type="button"
-                className="text-xs font-semibold text-[#4F46E5] hover:underline"
-              >
-                Add method
-              </button>
-            </div>
-            <ul className="mt-3 space-y-3">
-              <li className="flex items-center gap-3 rounded-xl border border-neutral-100 bg-neutral-50/50 p-3">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-slate-900 text-[10px] font-bold text-white">
-                  VISA
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">Visa (Personal checking)</p>
-                  <p className="text-xs text-neutral-500">Ending in 4242 · Default</p>
-                </div>
-                <span
-                  className="flex size-6 items-center justify-center rounded-full border-2 border-[#4F46E5] bg-indigo-50"
-                  aria-hidden
-                >
-                  <Check className="size-3 text-[#4F46E5]" />
-                </span>
-              </li>
-              <li className="flex items-center gap-3 rounded-xl border border-neutral-100 p-3">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-sky-600 text-[10px] font-bold text-white">
-                  PP
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-neutral-900">PayPal (Creator wallet)</p>
-                  <p className="text-xs text-neutral-500">janedoe@creators.com</p>
-                </div>
-                <button
-                  type="button"
-                  className="text-neutral-400 hover:text-neutral-600"
-                  aria-label="Options"
-                >
-                  <MoreVertical className="size-4" />
-                </button>
-              </li>
-            </ul>
+          <div className="rounded-2xl border border-neutral-200/80 bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-neutral-900">Payout methods</h2>
+            <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+              InstaCRM records invoices and paid totals from the table above—there are no saved bank or wallet cards here.
+              Track where you receive money (bank, UPI, PayPal, etc.) in your own tools; this page stays aligned with the
+              payment rows you manage.
+            </p>
           </div>
         </div>
 
-        <div className="relative mt-10 border-t border-neutral-200/80 pt-4">
-          <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
-            <p className="text-sm text-neutral-600">
-              <span className="font-semibold text-neutral-800">InstaCRM</span> — ©{" "}
-              {new Date().getFullYear()} InstaCRM. Built for Creators.
-            </p>
-            <nav className="flex flex-wrap items-center justify-center gap-4 text-xs text-neutral-500">
-              <a href="#" className="hover:text-[#4F46E5]">
-                Privacy
-              </a>
-              <a href="#" className="hover:text-[#4F46E5]">
-                Terms
-              </a>
-              <a href="#" className="hover:text-[#4F46E5]">
-                API
-              </a>
-              <a href="#" className="hover:text-[#4F46E5]">
-                Careers
-              </a>
-            </nav>
-          </div>
-        </div>
+        <EditInvoiceDialog
+          payment={editPayment}
+          open={editPayment != null}
+          onOpenChange={(o) => {
+            if (!o) setEditPayment(null);
+          }}
+          defaultWorkspaceCurrency={workspaceDefaultCurrency}
+        />
       </div>
     </PageFade>
   );

@@ -8,7 +8,7 @@ import {
   Draggable,
 } from "@hello-pangea/dnd";
 import { format } from "date-fns";
-import { ExternalLink, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { ExternalLink, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -23,6 +23,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const STAGES: { id: CampaignStatus; label: string; dot: string }[] = [
   { id: "inbox", label: "Inbox", dot: "bg-slate-400" },
@@ -37,6 +45,7 @@ const STAGES: { id: CampaignStatus; label: string; dot: string }[] = [
 type Props = {
   initial: Campaign[];
   onAddCampaign: (status: CampaignStatus) => void;
+  onEditCampaign: (c: Campaign) => void;
 };
 
 function deliverablesList(d: Campaign): string[] {
@@ -149,9 +158,11 @@ function CampaignCard({ d, isDragging }: { d: Campaign; isDragging: boolean }) {
   );
 }
 
-export function CampaignsKanban({ initial, onAddCampaign }: Props) {
+export function CampaignsKanban({ initial, onAddCampaign, onEditCampaign }: Props) {
   const router = useRouter();
   const [rows, setRows] = useState<Campaign[]>(initial);
+  const [pendingDelete, setPendingDelete] = useState<Campaign | null>(null);
+  const [deleting, setDeleting] = useState(false);
   useEffect(() => {
     setRows(initial);
   }, [initial]);
@@ -209,19 +220,61 @@ export function CampaignsKanban({ initial, onAddCampaign }: Props) {
   }, [rows]);
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <div className="-mx-1 flex touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto scroll-pb-2 scroll-pl-3 scroll-pr-3 px-1 pb-4 pt-1 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-4 sm:scroll-pl-4 sm:scroll-pr-4 md:mx-0 md:gap-3 md:scroll-px-0 md:px-0 md:pb-6 [&::-webkit-scrollbar]:h-2">
-        {STAGES.map((col) => (
-          <Column
-            key={col.id}
-            col={col}
-            campaigns={byStatus[col.id]}
-            onAddCampaign={onAddCampaign}
-            onDeleted={() => router.refresh()}
-          />
-        ))}
-      </div>
-    </DragDropContext>
+    <>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="-mx-1 flex touch-pan-x flex-wrap content-start gap-3 px-1 pb-4 pt-1 sm:gap-4 md:mx-0 md:flex-nowrap md:gap-3 md:overflow-x-auto md:overflow-y-visible md:px-0 md:pb-6 md:[-ms-overflow-style:none] md:[scrollbar-width:thin] md:[&::-webkit-scrollbar]:h-2">
+          {STAGES.map((col) => (
+            <Column
+              key={col.id}
+              col={col}
+              campaigns={byStatus[col.id]}
+              onAddCampaign={onAddCampaign}
+              onEditCampaign={onEditCampaign}
+              onRequestDelete={setPendingDelete}
+            />
+          ))}
+        </div>
+      </DragDropContext>
+
+      <Dialog open={pendingDelete != null} onOpenChange={(o) => !o && setPendingDelete(null)}>
+        <DialogContent className="border-neutral-200 bg-white sm:max-w-md" showCloseButton>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-neutral-900">Delete campaign?</DialogTitle>
+            <DialogDescription className="text-sm leading-relaxed text-neutral-600">
+              This removes the campaign from your board and deletes related automation tasks, linked deals (and their
+              pending payments), and campaign-created leads/brands when they are only tied to this campaign.{" "}
+              <span className="font-medium text-neutral-800">Activity history is kept.</span>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:justify-end">
+            <Button type="button" variant="outline" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={deleting}
+              onClick={async () => {
+                if (!pendingDelete) return;
+                setDeleting(true);
+                try {
+                  await deleteCampaign(pendingDelete.id);
+                  toast.success("Campaign deleted");
+                  setPendingDelete(null);
+                  router.refresh();
+                } catch (err) {
+                  toast.error(err instanceof Error ? err.message : "Error");
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -229,12 +282,14 @@ function Column({
   col,
   campaigns,
   onAddCampaign,
-  onDeleted,
+  onEditCampaign,
+  onRequestDelete,
 }: {
   col: (typeof STAGES)[number];
   campaigns: Campaign[];
   onAddCampaign: (status: CampaignStatus) => void;
-  onDeleted: () => void;
+  onEditCampaign: (c: Campaign) => void;
+  onRequestDelete: (c: Campaign) => void;
 }) {
   return (
     <div className="flex w-[min(280px,calc(100vw-2.5rem))] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm sm:w-[min(292px,82vw)]">
@@ -266,7 +321,7 @@ function Column({
           <div
             ref={prov.innerRef}
             {...prov.droppableProps}
-            className="max-h-[min(58dvh,640px)] min-h-[11rem] flex-1 space-y-2.5 overflow-y-auto overscroll-y-contain p-2 sm:max-h-[min(70dvh,780px)] sm:min-h-40 sm:space-y-3 sm:p-2.5"
+            className="min-h-[11rem] flex-1 space-y-2.5 p-2 sm:min-h-40 sm:space-y-3 sm:p-2.5"
           >
             {campaigns.map((d, i) => (
               <Draggable key={d.id} draggableId={d.id} index={i}>
@@ -287,19 +342,22 @@ function Column({
                         >
                           <MoreHorizontal className="size-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-40">
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuItem
+                            className="gap-2"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              onEditCampaign(d);
+                            }}
+                          >
+                            <Pencil className="size-3.5" />
+                            Edit
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             className="gap-2 text-rose-600"
-                            onClick={async (e) => {
+                            onClick={(e) => {
                               e.preventDefault();
-                              if (!confirm("Remove this campaign from the board?")) return;
-                              try {
-                                await deleteCampaign(d.id);
-                                toast.success("Removed");
-                                onDeleted();
-                              } catch (err) {
-                                toast.error(err instanceof Error ? err.message : "Error");
-                              }
+                              onRequestDelete(d);
                             }}
                           >
                             <Trash2 className="size-3.5" />

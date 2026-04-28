@@ -13,8 +13,14 @@ import type { Deal, DealStage } from "@/types/database";
 import { moveDeal } from "@/app/actions/crm";
 import { formatMoney } from "@/lib/money";
 import { toast } from "sonner";
-import { Plus } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const STAGES: { id: DealStage; label: string; dot: string }[] = [
   { id: "lead", label: "New inquiry", dot: "bg-blue-500" },
@@ -28,6 +34,7 @@ const STAGES: { id: DealStage; label: string; dot: string }[] = [
 type Props = {
   initial: Deal[];
   onAddDeal: (stage: DealStage) => void;
+  onEditDeal: (d: Deal) => void;
 };
 
 function reorderDeals(
@@ -71,11 +78,19 @@ function dealMetaLine(d: Deal) {
   return `Added ${format(new Date(d.created_at), "MMM d, yyyy")}`;
 }
 
-function DealCard({ d, isDragging }: { d: Deal; isDragging: boolean }) {
+function DealCard({
+  d,
+  isDragging,
+  onEdit,
+}: {
+  d: Deal;
+  isDragging: boolean;
+  onEdit: () => void;
+}) {
   return (
     <div
       className={cn(
-        "rounded-2xl border border-neutral-200/90 bg-white p-3 shadow-sm transition",
+        "relative group rounded-2xl border border-neutral-200/90 bg-white p-3 shadow-sm transition",
         isDragging && "border-indigo-300 shadow-lg ring-2 ring-indigo-200/60",
       )}
     >
@@ -84,11 +99,34 @@ function DealCard({ d, isDragging }: { d: Deal; isDragging: boolean }) {
         {formatMoney(d.value_cents, d.currency.toUpperCase())}
       </p>
       <p className="mt-1 text-xs text-neutral-500">{dealMetaLine(d)}</p>
+      <div className="pointer-events-none absolute top-2 right-2 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100 [&_button]:pointer-events-auto">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="inline-flex size-7 items-center justify-center rounded-md border border-neutral-200/80 bg-white/95 text-neutral-700 shadow-sm outline-none hover:bg-neutral-50"
+            aria-label="Deal actions"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <MoreHorizontal className="size-4" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-36" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuItem
+              className="gap-2"
+              onClick={(e) => {
+                e.preventDefault();
+                onEdit();
+              }}
+            >
+              <Pencil className="size-3.5" />
+              Edit
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
 
-export function DealsKanban({ initial, onAddDeal }: Props) {
+export function DealsKanban({ initial, onAddDeal, onEditDeal }: Props) {
   const [deals, setDeals] = useState<Deal[]>(initial);
   useEffect(() => {
     setDeals(initial);
@@ -149,9 +187,9 @@ export function DealsKanban({ initial, onAddDeal }: Props) {
 
   return (
     <DragDropContext onDragEnd={onDragEnd}>
-      <div className="-mx-1 flex touch-pan-x snap-x snap-mandatory gap-3 overflow-x-auto scroll-pb-2 scroll-pl-3 scroll-pr-3 px-1 pb-4 pt-1 [-ms-overflow-style:none] [scrollbar-width:thin] sm:gap-4 sm:scroll-pl-4 sm:scroll-pr-4 md:mx-0 md:gap-4 md:scroll-px-0 md:px-0 md:pb-6 [&::-webkit-scrollbar]:h-2">
+      <div className="-mx-1 flex touch-pan-x flex-wrap content-start gap-3 px-1 pb-4 pt-1 sm:gap-4 md:mx-0 md:flex-nowrap md:gap-4 md:overflow-x-auto md:overflow-y-visible md:px-0 md:pb-6 md:[-ms-overflow-style:none] md:[scrollbar-width:thin] md:[&::-webkit-scrollbar]:h-2">
         {STAGES.map((col) => (
-          <Column key={col.id} col={col} deals={byStage[col.id]} onAddDeal={onAddDeal} />
+          <Column key={col.id} col={col} deals={byStage[col.id]} onAddDeal={onAddDeal} onEditDeal={onEditDeal} />
         ))}
       </div>
     </DragDropContext>
@@ -162,10 +200,12 @@ function Column({
   col,
   deals,
   onAddDeal,
+  onEditDeal,
 }: {
   col: (typeof STAGES)[number];
   deals: Deal[];
   onAddDeal: (stage: DealStage) => void;
+  onEditDeal: (d: Deal) => void;
 }) {
   return (
     <div className="flex w-[min(280px,calc(100vw-2.5rem))] shrink-0 snap-start flex-col overflow-hidden rounded-2xl border border-neutral-200/90 bg-white shadow-sm sm:w-[min(300px,85vw)]">
@@ -195,7 +235,7 @@ function Column({
           <div
             ref={prov.innerRef}
             {...prov.droppableProps}
-            className="max-h-[min(58dvh,640px)] min-h-[11rem] flex-1 space-y-2.5 overflow-y-auto overscroll-y-contain p-2 sm:max-h-[min(70dvh,780px)] sm:min-h-40 sm:space-y-3 sm:p-2.5"
+            className="min-h-[11rem] flex-1 space-y-2.5 p-2 sm:min-h-40 sm:space-y-3 sm:p-2.5"
           >
             {deals.map((d, i) => (
               <Draggable key={d.id} draggableId={d.id} index={i}>
@@ -203,10 +243,15 @@ function Column({
                   <div
                     ref={p.innerRef}
                     {...p.draggableProps}
-                    {...p.dragHandleProps}
-                    className="touch-manipulation active:cursor-grabbing"
+                    className="relative touch-manipulation active:cursor-grabbing"
                   >
-                    <DealCard d={d} isDragging={s.isDragging} />
+                    <div {...p.dragHandleProps}>
+                      <DealCard
+                        d={d}
+                        isDragging={s.isDragging}
+                        onEdit={() => onEditDeal(d)}
+                      />
+                    </div>
                   </div>
                 )}
               </Draggable>

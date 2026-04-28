@@ -21,10 +21,17 @@ type Props = {
 export function DealsView({ initial, summary, workspaceDefaultCurrency }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [addStage, setAddStage] = useState<DealStage>("lead");
+  const [editDeal, setEditDeal] = useState<Deal | null>(null);
 
   const openAdd = (stage: DealStage) => {
+    setEditDeal(null);
     setAddStage(stage);
     setAddOpen(true);
+  };
+
+  const handleDealModalOpen = (open: boolean) => {
+    setAddOpen(open);
+    if (!open) setEditDeal(null);
   };
 
   return (
@@ -34,12 +41,21 @@ export function DealsView({ initial, summary, workspaceDefaultCurrency }: Props)
         onAddDeal={() => openAdd("lead")}
         workspaceDefaultCurrency={workspaceDefaultCurrency}
       />
-      <DealsKanban initial={initial} onAddDeal={openAdd} />
+      <DealsKanban
+        initial={initial}
+        onAddDeal={openAdd}
+        onEditDeal={(d) => {
+          setEditDeal(d);
+          setAddStage(d.stage);
+          setAddOpen(true);
+        }}
+      />
       <AddDealModal
         open={addOpen}
-        onOpenChange={setAddOpen}
+        onOpenChange={handleDealModalOpen}
         defaultStage={addStage}
         defaultCurrency={workspaceDefaultCurrency}
+        initialDeal={editDeal}
       />
     </div>
   );

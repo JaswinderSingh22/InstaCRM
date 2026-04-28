@@ -7,6 +7,7 @@ import {
   Download,
   LineChart,
   MoreVertical,
+  Pencil,
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AddLeadModal } from "@/components/leads/add-lead-modal";
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,6 +124,7 @@ export function LeadsManagementView({
   const [priorityFilter, setPriorityFilter] = useState<LeadPriority | "all">("all");
   const [sourceFilter, setSourceFilter] = useState<string>("all");
   const [page, setPage] = useState(1);
+  const [editLead, setEditLead] = useState<Lead | null>(null);
 
   const sourceOptions = useMemo(() => {
     const set = new Set<string>();
@@ -467,6 +470,13 @@ export function LeadsManagementView({
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem
                               className="text-neutral-800"
+                              onClick={() => setEditLead(l)}
+                            >
+                              <Pencil className="mr-2 size-3.5" />
+                              Edit lead
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-neutral-800"
                               onClick={async () => {
                                 if (
                                   !confirm(
@@ -613,6 +623,13 @@ export function LeadsManagementView({
           </div>
         </div>
       </div>
+      <EditLeadDialog
+        lead={editLead}
+        open={editLead != null}
+        onOpenChange={(o) => {
+          if (!o) setEditLead(null);
+        }}
+      />
     </div>
   );
 }

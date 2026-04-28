@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AppHeader } from "@/components/layout/app-header";
+import type { WorkspaceUsageBadge } from "@/lib/billing/workspace-usage";
 import { cn } from "@/lib/utils";
 
 type Profile = {
@@ -16,10 +17,12 @@ export function AppLayoutClient({
   children,
   user,
   profile,
+  usage,
 }: {
   children: ReactNode;
   user: User;
   profile: Profile | null;
+  usage: WorkspaceUsageBadge | null;
 }) {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const pathname = usePathname();
@@ -55,6 +58,7 @@ export function AppLayoutClient({
           email={user.email ?? ""}
           name={name}
           avatarUrl={avatarUrl}
+          usage={usage}
           onOpenMobileNav={() => setMobileNavOpen(true)}
         />
         <main className="p-4 pb-6 sm:p-6 lg:px-8 lg:pb-8">{children}</main>

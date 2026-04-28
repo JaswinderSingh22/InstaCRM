@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,12 +12,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { createCampaign, parseBriefWithAi } from "@/app/actions/campaigns";
+import { createCampaign, parseBriefWithAi, updateCampaign } from "@/app/actions/campaigns";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import type { ParsedCampaignBrief } from "@/lib/openai/parse-campaign-brief";
-import type { CampaignCompensationType, CampaignStatus } from "@/types/database";
+import type { Campaign, CampaignCompensationType, CampaignStatus } from "@/types/database";
 import { normalizeWorkspaceCurrency } from "@/lib/currency";
 
 type Props = {
@@ -25,6 +25,8 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   defaultStatus?: CampaignStatus;
   defaultCurrency: string;
+  /** When set, modal acts as editor and calls `updateCampaign` on save. */
+  initialCampaign?: Campaign | null;
 };
 
 const COMP_TYPES: { id: CampaignCompensationType; label: string }[] = [
@@ -39,8 +41,10 @@ export function AddCampaignModal({
   onOpenChange,
   defaultStatus = "inbox",
   defaultCurrency,
+  initialCampaign = null,
 }: Props) {
   const router = useRouter();
+  const isEdit = Boolean(initialCampaign?.id);
   const [loading, setLoading] = useState(false);
   const [parsing, setParsing] = useState(false);
   const [paste, setPaste] = useState("");
@@ -60,14 +64,7 @@ export function AddCampaignModal({
   const [currency, setCurrency] = useState(defaultCurrency);
   const [status, setStatus] = useState<CampaignStatus>(defaultStatus);
 
-  useEffect(() => {
-    if (open) {
-      setStatus(defaultStatus);
-      setCurrency(defaultCurrency);
-    }
-  }, [open, defaultStatus, defaultCurrency]);
-
-  const resetForm = () => {
+  const resetForm = useCallback(() => {
     setPaste("");
     setTitle("");
     setBrandName("");
@@ -83,7 +80,40 @@ export function AddCampaignModal({
     setLocationNotes("");
     setRequirementsNotes("");
     setCurrency(defaultCurrency);
-  };
+  }, [defaultCurrency]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (initialCampaign) {
+      const ic = initialCampaign;
+      setPaste("");
+      setTitle(ic.title);
+      setBrandName(ic.brand_name ?? "");
+      setAgencyName(ic.agency_name ?? "");
+      setCompSummary(ic.compensation_summary ?? "");
+      setCompCents(
+        ic.compensation_cents != null && ic.compensation_cents > 0
+          ? String(Math.round(ic.compensation_cents / 100))
+          : "",
+      );
+      setCompType(ic.compensation_type ?? "unknown");
+      setDeliverablesText(
+        Array.isArray(ic.deliverables) ? ic.deliverables.filter((x): x is string => typeof x === "string").join("\n") : "",
+      );
+      setShootDate(ic.shoot_date ?? "");
+      setPostDate(ic.post_date ?? "");
+      setPostDateEnd(ic.post_date_end ?? "");
+      setApplyUrl(ic.apply_url ?? "");
+      setLocationNotes(ic.location_notes ?? "");
+      setRequirementsNotes(ic.requirements_notes ?? "");
+      setCurrency(ic.currency?.trim() ? normalizeWorkspaceCurrency(ic.currency) : defaultCurrency);
+      setStatus(ic.status);
+      return;
+    }
+    resetForm();
+    setStatus(defaultStatus);
+    setCurrency(defaultCurrency);
+  }, [open, initialCampaign, defaultStatus, defaultCurrency, resetForm]);
 
   const applyParsed = (p: ParsedCampaignBrief) => {
     if (p.title) setTitle(p.title);
@@ -105,9 +135,13 @@ export function AddCampaignModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto border-neutral-200 bg-white sm:max-w-lg" showCloseButton>
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-neutral-900">New campaign</DialogTitle>
+          <DialogTitle className="text-lg font-bold text-neutral-900">
+            {isEdit ? "Edit campaign" : "New campaign"}
+          </DialogTitle>
           <DialogDescription>
-            Paste a WhatsApp brief and use AI to fill fields, or enter details manually.
+            {isEdit
+              ? "Update brief details — pipeline stage stays on the board unless you move the card."
+              : "Paste a WhatsApp brief and use AI to fill fields, or enter details manually."}
           </DialogDescription>
         </DialogHeader>
 
@@ -147,10 +181,6 @@ export function AddCampaignModal({
               )}
               Extract with AI
             </Button>
-            <p className="text-[11px] text-neutral-500">
-              Needs <code className="rounded bg-neutral-100 px-1">OPENAI_API_KEY</code> in your server env. You can
-              still add campaigns manually.
-            </p>
           </div>
 
           <div className="border-t border-neutral-100 pt-3">
@@ -306,7 +336,7 @@ export function AddCampaignModal({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="c-status">Starting column</Label>
+                <Label htmlFor="c-status">{isEdit ? "Column (stage)" : "Starting column"}</Label>
                 <select
                   id="c-status"
                   value={status}
@@ -351,26 +381,48 @@ export function AddCampaignModal({
                   .filter(Boolean);
                 setLoading(true);
                 try {
-                  await createCampaign({
-                    title: title.trim(),
-                    status,
-                    brand_name: brandName || null,
-                    agency_name: agencyName || null,
-                    compensation_summary: compSummary || null,
-                    compensation_cents,
-                    compensation_type: compType,
-                    deliverables: lines,
-                    shoot_date: shootDate || null,
-                    post_date: postDate || null,
-                    post_date_end: postDateEnd || null,
-                    apply_url: applyUrl || null,
-                    location_notes: locationNotes || null,
-                    requirements_notes: requirementsNotes || null,
-                    source_message: paste.trim() || null,
-                    currency: normalizeWorkspaceCurrency(currency || defaultCurrency),
-                  });
-                  toast.success("Campaign saved");
-                  resetForm();
+                  if (isEdit && initialCampaign) {
+                    await updateCampaign(initialCampaign.id, {
+                      title: title.trim(),
+                      status,
+                      brand_name: brandName || null,
+                      agency_name: agencyName || null,
+                      compensation_summary: compSummary || null,
+                      compensation_cents,
+                      compensation_type: compType,
+                      deliverables: lines,
+                      shoot_date: shootDate || null,
+                      post_date: postDate || null,
+                      post_date_end: postDateEnd || null,
+                      apply_url: applyUrl || null,
+                      location_notes: locationNotes || null,
+                      requirements_notes: requirementsNotes || null,
+                      source_message: paste.trim() || initialCampaign.source_message || null,
+                      currency: normalizeWorkspaceCurrency(currency || defaultCurrency),
+                    });
+                    toast.success("Campaign updated");
+                  } else {
+                    await createCampaign({
+                      title: title.trim(),
+                      status,
+                      brand_name: brandName || null,
+                      agency_name: agencyName || null,
+                      compensation_summary: compSummary || null,
+                      compensation_cents,
+                      compensation_type: compType,
+                      deliverables: lines,
+                      shoot_date: shootDate || null,
+                      post_date: postDate || null,
+                      post_date_end: postDateEnd || null,
+                      apply_url: applyUrl || null,
+                      location_notes: locationNotes || null,
+                      requirements_notes: requirementsNotes || null,
+                      source_message: paste.trim() || null,
+                      currency: normalizeWorkspaceCurrency(currency || defaultCurrency),
+                    });
+                    toast.success("Campaign saved");
+                  }
+                  if (!isEdit) resetForm();
                   onOpenChange(false);
                   router.refresh();
                 } catch (e) {
@@ -380,7 +432,7 @@ export function AddCampaignModal({
                 }
               }}
             >
-              {loading ? <Loader2 className="size-4 animate-spin" /> : "Save campaign"}
+              {loading ? <Loader2 className="size-4 animate-spin" /> : isEdit ? "Save changes" : "Save campaign"}
             </Button>
           </div>
         </div>

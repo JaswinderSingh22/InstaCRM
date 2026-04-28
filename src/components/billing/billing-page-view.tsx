@@ -6,28 +6,13 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
-import { Check, Download, Loader2, Sparkles } from "lucide-react";
+import { Check, Loader2, Sparkles } from "lucide-react";
 import {
   PRICING,
   YEARLY_BILLING_DISCOUNT,
   yearlyMonthlyEquivalent,
 } from "@/lib/pricing-plans";
-
-type BillingTier = "free" | "pro" | "agency";
-
-function normalizeTier(plan: string | null, subscriptionStatus: string): BillingTier {
-  const p = (plan ?? "").toLowerCase();
-  const s = subscriptionStatus.toLowerCase();
-  if (p.includes("agency")) return "agency";
-  if (p.includes("pro") || s === "active" || s === "trialing") return "pro";
-  return "free";
-}
-
-function leadCapForTier(tier: BillingTier): number {
-  if (tier === "free") return 10;
-  if (tier === "agency") return 100_000;
-  return 10_000;
-}
+import { leadCapForTier, normalizeTier } from "@/lib/billing/entitlements";
 
 function capLabel(cap: number): string {
   if (cap >= 100_000) return "unlimited leads";
@@ -39,15 +24,29 @@ type Props = {
   plan: string | null;
   subscriptionStatus: string;
   leadCount: number;
+  /** AI campaign brief parses used this UTC month */
+  aiBriefParsesUsed: number;
+  /** null = unlimited (Agency) */
+  aiBriefParsesLimit: number | null;
 };
 
-export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) {
+export function BillingPageView({
+  plan,
+  subscriptionStatus,
+  leadCount,
+  aiBriefParsesUsed,
+  aiBriefParsesLimit,
+}: Props) {
   const [interval, setInterval] = useState<"monthly" | "yearly">("yearly");
   const [load, setLoad] = useState<"checkout" | "portal" | null>(null);
 
   const tier = normalizeTier(plan, subscriptionStatus);
   const cap = leadCapForTier(tier);
   const usagePct = Math.min(100, Math.round((leadCount / Math.max(cap, 1)) * 100));
+  const aiPct =
+    aiBriefParsesLimit != null
+      ? Math.min(100, Math.round((aiBriefParsesUsed / Math.max(aiBriefParsesLimit, 1)) * 100))
+      : 0;
 
   const openCheckout = async () => {
     setLoad("checkout");
@@ -87,12 +86,6 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
       : PRICING.talentAgency.monthlyPrice;
   const savePct = Math.round(YEARLY_BILLING_DISCOUNT * 100);
 
-  const historyRows = [
-    { date: "Oct 12, 2023", amount: "$290.00", status: "paid" as const },
-    { date: "Sep 12, 2023", amount: "$29.00", status: "paid" as const },
-    { date: "Aug 12, 2023", amount: "$29.00", status: "paid" as const },
-  ];
-
   return (
     <div className="mx-auto max-w-6xl space-y-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -126,10 +119,30 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
             </div>
             <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-violet-100">
               <span>
-                {usagePct}% of {capLabel(cap)}
+                Leads: {leadCount.toLocaleString()} / {capLabel(cap)} ({usagePct}%)
               </span>
               <span className="text-violet-200/90">·</span>
-              <span className="text-violet-200/90">{leadCount.toLocaleString()} leads in workspace</span>
+              <span className="text-violet-200/90">Active leads only (archived excluded)</span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/20">
+              <div
+                className="h-full rounded-full bg-emerald-200/90 transition-all"
+                style={{ width: `${aiBriefParsesLimit != null ? aiPct : 100}%` }}
+              />
+            </div>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-violet-100">
+              <span>
+                AI brief extractions (UTC month):{" "}
+                {aiBriefParsesLimit != null ? (
+                  <>
+                    {aiBriefParsesUsed} / {aiBriefParsesLimit}
+                  </>
+                ) : (
+                  <>unlimited</>
+                )}
+              </span>
+              <span className="text-violet-200/90">·</span>
+              <span className="text-violet-200/90">Pro: 120/mo · Free: 2/mo</span>
             </div>
           </div>
           <Button
@@ -267,48 +280,31 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
               onClick={() => void openPortal()}
               className="text-sm font-semibold text-[#4F46E5] hover:underline"
             >
-              View all receipts →
+              Open Stripe customer portal →
             </button>
           </div>
-          <Card className="overflow-hidden border-neutral-200/80 bg-white shadow-sm ring-neutral-200/60">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-100 bg-neutral-50/80 text-left text-xs font-semibold uppercase tracking-wide text-neutral-500">
-                    <th className="px-5 py-3">Date</th>
-                    <th className="px-5 py-3">Amount</th>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3 text-right">Invoice</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historyRows.map((row) => (
-                    <tr key={row.date} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-5 py-4 font-medium text-neutral-800">{row.date}</td>
-                      <td className="px-5 py-4 tabular-nums text-neutral-800">{row.amount}</td>
-                      <td className="px-5 py-4">
-                        <span className="inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold tracking-wide text-emerald-800">
-                          PAID
-                        </span>
-                      </td>
-                      <td className="px-5 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => void openPortal()}
-                          className="inline-flex rounded-lg p-2 text-neutral-500 hover:bg-neutral-100 hover:text-[#4F46E5]"
-                          aria-label="Download invoice"
-                        >
-                          <Download className="size-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="border-t border-neutral-100 px-5 py-3 text-xs text-neutral-500">
-              Sample activity shown. Open the customer portal for live invoices and receipts.
-            </p>
+          <Card className="border-neutral-200/80 bg-white shadow-sm ring-neutral-200/60">
+            <CardContent className="py-10 text-center">
+              <p className="mx-auto max-w-md text-sm text-neutral-600">
+                Invoices and receipts for your <span className="font-medium text-neutral-800">subscription</span> live in
+                Stripe. Use{" "}
+                <button
+                  type="button"
+                  onClick={() => void openPortal()}
+                  className="font-semibold text-[#4F46E5] hover:underline"
+                >
+                  Manage plan
+                </button>{" "}
+                to download PDFs and update payment methods.
+              </p>
+              <p className="mx-auto mt-3 max-w-md text-xs text-neutral-500">
+                Creator payouts and campaign invoices are tracked separately under{" "}
+                <Link href="/payments" className="font-semibold text-[#4F46E5] hover:underline">
+                  Payments
+                </Link>
+                .
+              </p>
+            </CardContent>
           </Card>
         </section>
 
@@ -316,34 +312,15 @@ export function BillingPageView({ plan, subscriptionStatus, leadCount }: Props) 
           <Card className="border-neutral-200/80 bg-white shadow-sm ring-neutral-200/60">
             <CardHeader>
               <CardTitle className="text-base font-semibold text-neutral-900">Payment method</CardTitle>
-              <CardDescription>Cards on file for this workspace.</CardDescription>
+              <CardDescription>Manage cards and bank details for your workspace subscription.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between rounded-xl border border-neutral-200 bg-[#F8F9FC] p-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-14 items-center justify-center rounded-md bg-white text-xs font-bold italic text-indigo-900 shadow-sm ring-1 ring-neutral-200/80">
-                    Visa
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-neutral-900">Visa ending in 4242</p>
-                    <p className="text-xs text-neutral-500">Expiry 12/2024</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void openPortal()}
-                  className="text-sm font-semibold text-[#4F46E5] hover:underline"
-                >
-                  Edit
-                </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => void openPortal()}
-                className="text-sm font-semibold text-[#4F46E5] hover:underline"
-              >
-                + Add new payment method
-              </button>
+            <CardContent className="space-y-3">
+              <p className="text-sm text-neutral-600">
+                We don&apos;t display saved cards here. Open the Stripe customer portal to view or edit payment methods.
+              </p>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={() => void openPortal()}>
+                Manage payment methods in Stripe
+              </Button>
             </CardContent>
           </Card>
 

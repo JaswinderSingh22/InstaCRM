@@ -15,7 +15,8 @@ export const PRICING = {
     monthlyPrice: 0,
     description: "Perfect for micro-creators validating brand partnerships.",
     features: [
-      "Up to 10 leads",
+      "Up to 5 active leads",
+      "2 AI campaign brief extractions / month (UTC)",
       "5 active deals",
       "Basic templates",
       "Email support",
@@ -28,7 +29,8 @@ export const PRICING = {
     monthlyPrice: 29,
     description: "For serious creators running multiple brand deals.",
     features: [
-      "Unlimited leads & deals",
+      "120 AI campaign brief extractions / month (UTC)",
+      "Generous lead & deal limits for solo creators",
       "Custom CRM dashboard",
       "Advanced analytics",
       "Priority support",

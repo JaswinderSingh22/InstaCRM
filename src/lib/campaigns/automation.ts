@@ -1,17 +1,14 @@
-import { addDays, setHours, startOfDay } from "date-fns";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createBrandReturningId, createLeadReturningId, createTask } from "@/app/actions/crm";
+import { addDays, parseISO } from "date-fns";
+import { createBrandReturningId, createLeadReturningId } from "@/app/actions/crm";
 import { recordWorkspaceActivity } from "@/lib/activity/record-workspace-event";
-import type { Campaign, CampaignStatus } from "@/types/database";
+import { normalizeWorkspaceCurrency } from "@/lib/currency";
+import type { Campaign, TaskRelated } from "@/types/database";
 
 type SB = SupabaseClient;
 
-function dateWithLocalMorning(isoDate: string | null, hour = 9): string | null {
-  if (!isoDate?.trim()) return null;
-  const d = startOfDay(new Date(`${isoDate.trim()}T00:00:00`));
-  if (Number.isNaN(d.getTime())) return null;
-  return setHours(d, hour).toISOString();
-}
+/** Open pipeline stages used for default deal ordering. */
+const OPEN_DEAL_STAGES = ["lead", "qualified", "proposal", "negotiation"] as const;
 
 function campaignRefBlock(c: Campaign): string {
   const budgetLine =
@@ -58,28 +55,41 @@ async function refreshCampaign(supabase: SB, workspaceId: string, id: string): P
 }
 
 async function patchCampaign(supabase: SB, workspaceId: string, id: string, patch: Record<string, unknown>) {
-  await supabase.from("campaigns").update(patch).eq("id", id).eq("workspace_id", workspaceId);
+  const { error } = await supabase.from("campaigns").update(patch).eq("id", id).eq("workspace_id", workspaceId);
+  if (error) throw error;
 }
 
-/** Create a pipeline deal once per campaign (idempotent via linked_deal_id). */
+function dealTitleForCampaign(c: Campaign): string {
+  return `Campaign: ${c.title.slice(0, 120)}`;
+}
+
+/** Create one pipeline deal per campaign (idempotent). Call only from bootstrap after create. */
 async function ensureCampaignDeal(
   supabase: SB,
   workspaceId: string,
   c: Campaign,
   actorId: string,
 ): Promise<Campaign> {
-  const cur = c;
+  const fresh = await refreshCampaign(supabase, workspaceId, c.id);
+  const cur = fresh ?? c;
   if (cur.linked_deal_id) return cur;
 
+  const dealTitle = dealTitleForCampaign(cur);
+
+  const orphanId = await findOrphanDealByTitle(supabase, workspaceId, dealTitle);
+  if (orphanId) {
+    await patchCampaign(supabase, workspaceId, cur.id, { linked_deal_id: orphanId });
+    return (await refreshCampaign(supabase, workspaceId, cur.id)) ?? cur;
+  }
+
   const valueCents = cur.compensation_cents ?? 0;
-  const title = `Campaign: ${cur.title.slice(0, 120)}`;
   const currency = (cur.currency || "INR").trim().toUpperCase();
 
   const { data: last } = await supabase
     .from("deals")
     .select("position")
     .eq("workspace_id", workspaceId)
-    .eq("stage", "negotiation")
+    .in("stage", [...OPEN_DEAL_STAGES])
     .order("position", { ascending: false })
     .limit(1);
   const pos = ((last?.[0] as { position?: number } | undefined)?.position ?? -10) + 10;
@@ -88,10 +98,10 @@ async function ensureCampaignDeal(
     .from("deals")
     .insert({
       workspace_id: workspaceId,
-      title,
+      title: dealTitle,
       value_cents: valueCents,
       currency,
-      stage: "negotiation",
+      stage: "proposal",
       position: pos,
       brand_id: cur.linked_brand_id ?? null,
       lead_id: cur.linked_lead_id ?? null,
@@ -107,8 +117,8 @@ async function ensureCampaignDeal(
     workspaceId,
     actorId,
     eventType: "deal_created",
-    title: `Deal opened: ${title}`,
-    summary: "Created from campaign pipeline",
+    title: `Deal opened: ${dealTitle}`,
+    summary: "Created with campaign",
     entityType: "deal",
     entityId: (dealRow as { id: string }).id,
   });
@@ -117,7 +127,253 @@ async function ensureCampaignDeal(
   return next ?? cur;
 }
 
-/** Ensure brand + lead exist; updates campaign row. Returns refreshed campaign. */
+/** Deal with this title not referenced by any campaign’s linked_deal_id (safe to attach). */
+async function findOrphanDealByTitle(
+  supabase: SB,
+  workspaceId: string,
+  title: string,
+): Promise<string | null> {
+  const { data: deals } = await supabase
+    .from("deals")
+    .select("id")
+    .eq("workspace_id", workspaceId)
+    .eq("title", title)
+    .order("created_at", { ascending: true });
+
+  const rows = (deals ?? []) as { id: string }[];
+  if (rows.length === 0) return null;
+
+  const { data: refs } = await supabase
+    .from("campaigns")
+    .select("linked_deal_id")
+    .eq("workspace_id", workspaceId)
+    .not("linked_deal_id", "is", null);
+
+  const linked = new Set(
+    ((refs ?? []) as { linked_deal_id: string | null }[])
+      .map((r) => r.linked_deal_id)
+      .filter(Boolean) as string[],
+  );
+
+  const orphan = rows.find((r) => !linked.has(r.id));
+  return orphan?.id ?? null;
+}
+
+function ymdToUtcIso(ymd: string | null, hourUtc: number): string | null {
+  if (!ymd) return null;
+  const parts = ymd.split("-").map(Number);
+  const y = parts[0];
+  const m = parts[1];
+  const d = parts[2];
+  if (y == null || m == null || d == null) return null;
+  return new Date(Date.UTC(y, m - 1, d, hourUtc, 0, 0)).toISOString();
+}
+
+type TaskSlot = "applied" | "shoot" | "post" | "completed";
+
+const TASK_FIELD: Record<
+  TaskSlot,
+  "auto_task_applied_id" | "auto_task_shoot_id" | "auto_task_post_id" | "auto_task_completed_id"
+> = {
+  applied: "auto_task_applied_id",
+  shoot: "auto_task_shoot_id",
+  post: "auto_task_post_id",
+  completed: "auto_task_completed_id",
+} as const;
+
+function taskTitleForSlot(c: Campaign, slot: TaskSlot): string {
+  const t = c.title.slice(0, 100);
+  switch (slot) {
+    case "applied":
+      return `Apply / follow up: ${t}`;
+    case "shoot":
+      return `Shoot day: ${t}`;
+    case "post":
+      return `Post content: ${t}`;
+    case "completed":
+      return `Wrap & payment: ${t}`;
+  }
+}
+
+function taskDescription(c: Campaign): string {
+  return `From campaign board. Campaign ID: ${c.id}`;
+}
+
+function dueForSlot(c: Campaign, slot: TaskSlot): string | null {
+  const created = parseISO(c.created_at);
+  switch (slot) {
+    case "applied":
+      return addDays(created, 3).toISOString();
+    case "shoot":
+      return ymdToUtcIso(c.shoot_date, 9);
+    case "post":
+      return ymdToUtcIso(c.post_date, 9);
+    case "completed": {
+      const end = c.post_date_end || c.post_date;
+      return ymdToUtcIso(end, 12);
+    }
+  }
+}
+
+async function upsertOneCalendarTask(
+  supabase: SB,
+  workspaceId: string,
+  c: Campaign,
+  slot: TaskSlot,
+  related: { type: TaskRelated; id: string },
+): Promise<string | null> {
+  const dueAt = dueForSlot(c, slot);
+  const field = TASK_FIELD[slot];
+  const existingId = (c[field] as string | null) ?? null;
+
+  if (!dueAt) {
+    if (existingId) {
+      await supabase.from("tasks").delete().eq("id", existingId).eq("workspace_id", workspaceId);
+      await patchCampaign(supabase, workspaceId, c.id, { [field]: null });
+    }
+    return null;
+  }
+
+  const title = taskTitleForSlot(c, slot);
+  const desc = taskDescription(c);
+
+  if (existingId) {
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        title,
+        description: desc,
+        due_at: dueAt,
+        reminder_at: null,
+        related_type: related.type,
+        related_id: related.id,
+      })
+      .eq("id", existingId)
+      .eq("workspace_id", workspaceId);
+    if (error) throw error;
+    return existingId;
+  }
+
+  const { data: row, error } = await supabase
+    .from("tasks")
+    .insert({
+      workspace_id: workspaceId,
+      title,
+      description: desc,
+      due_at: dueAt,
+      reminder_at: null,
+      completed: false,
+      related_type: related.type,
+      related_id: related.id,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  const newId = (row as { id: string }).id;
+  await patchCampaign(supabase, workspaceId, c.id, { [field]: newId });
+  return newId;
+}
+
+/**
+ * Create/update calendar tasks tied to the campaign deal. Runs after deal exists.
+ */
+export async function syncCampaignCalendarTasks(
+  supabase: SB,
+  workspaceId: string,
+  c: Campaign,
+): Promise<void> {
+  const dealId = c.linked_deal_id;
+  if (!dealId) return;
+
+  const related = { type: "deal" as const, id: dealId };
+  const slots: TaskSlot[] = ["applied", "shoot", "post", "completed"];
+  for (const slot of slots) {
+    await upsertOneCalendarTask(supabase, workspaceId, c, slot, related);
+  }
+}
+
+async function ensureCampaignPayment(
+  supabase: SB,
+  workspaceId: string,
+  c: Campaign,
+  actorId: string,
+): Promise<void> {
+  if (!c.linked_deal_id) return;
+
+  const clientName = (c.brand_name?.trim() || c.title.trim()).slice(0, 200);
+  const description = `Campaign: ${c.title.slice(0, 180)}`;
+  const amountCents = Math.max(0, c.compensation_cents ?? 0);
+  const currency = normalizeWorkspaceCurrency((c.currency || "INR").trim());
+  const dueDate = c.post_date_end || c.post_date || null;
+
+  const { data: existing } = await supabase
+    .from("payments")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("deal_id", c.linked_deal_id)
+    .maybeSingle();
+
+  if (!existing) {
+    const { data: inserted, error } = await supabase
+      .from("payments")
+      .insert({
+        workspace_id: workspaceId,
+        deal_id: c.linked_deal_id,
+        campaign_id: c.id,
+        client_name: clientName,
+        amount_cents: amountCents,
+        currency,
+        status: "pending",
+        due_date: dueDate,
+        description,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    await recordWorkspaceActivity(supabase, {
+      workspaceId,
+      actorId,
+      eventType: "payment_created",
+      title: `Invoice: ${clientName}`,
+      summary: description,
+      entityType: "payment",
+      entityId: (inserted as { id: string }).id,
+    });
+    return;
+  }
+
+  const pay = existing as { id: string; status: string };
+  if (pay.status === "paid" || pay.status === "canceled") return;
+
+  const { error: upErr } = await supabase
+    .from("payments")
+    .update({
+      client_name: clientName,
+      amount_cents: amountCents,
+      currency,
+      due_date: dueDate,
+      description,
+      campaign_id: c.id,
+    })
+    .eq("id", pay.id)
+    .eq("workspace_id", workspaceId);
+  if (upErr) throw upErr;
+}
+
+/** Refresh tasks + pending invoice from latest campaign fields (safe to call often). */
+export async function syncCampaignDerivedRecords(
+  supabase: SB,
+  workspaceId: string,
+  campaignId: string,
+  _actorId: string,
+): Promise<void> {
+  const cur = await refreshCampaign(supabase, workspaceId, campaignId);
+  if (!cur?.linked_deal_id) return;
+  await syncCampaignCalendarTasks(supabase, workspaceId, cur);
+  await ensureCampaignPayment(supabase, workspaceId, cur, _actorId);
+}
+
+/** Ensure brand + lead exist; updates campaign row. */
 export async function ensureCampaignBrandAndLead(supabase: SB, workspaceId: string, c: Campaign): Promise<Campaign> {
   let cur = c;
   let brandId = cur.linked_brand_id;
@@ -160,124 +416,32 @@ export async function ensureCampaignBrandAndLead(supabase: SB, workspaceId: stri
   return cur;
 }
 
-async function handleApplied(supabase: SB, workspaceId: string, c: Campaign, _actorId: string) {
-  let cur = await ensureCampaignBrandAndLead(supabase, workspaceId, c);
-  cur = (await refreshCampaign(supabase, workspaceId, c.id)) ?? cur;
-  if (cur.auto_task_applied_id) return;
-
-  const due = addDays(setHours(startOfDay(new Date()), 9), 2).toISOString();
-  const { task } = await createTask({
-    title: `Follow up: ${cur.title.slice(0, 80)}`,
-    description: `Application submitted — check for shortlist / next steps.\n\n${campaignRefBlock(cur)}`,
-    dueAt: due,
-    relatedType: cur.linked_lead_id ? "lead" : "none",
-    relatedId: cur.linked_lead_id,
-  });
-  await patchCampaign(supabase, workspaceId, cur.id, { auto_task_applied_id: task.id });
-}
-
-async function handleInProgress(supabase: SB, workspaceId: string, c: Campaign, actorId: string) {
-  let cur = await ensureCampaignBrandAndLead(supabase, workspaceId, c);
-  cur = (await refreshCampaign(supabase, workspaceId, c.id)) ?? cur;
-  cur = await ensureCampaignDeal(supabase, workspaceId, cur, actorId);
-
-  if (cur.shoot_date && !cur.auto_task_shoot_id) {
-    const due = dateWithLocalMorning(cur.shoot_date, 9);
-    if (due) {
-      const { task } = await createTask({
-        title: `Shoot: ${cur.title.slice(0, 70)}`,
-        description: `Campaign shoot day.\n\n${campaignRefBlock(cur)}`,
-        dueAt: due,
-        relatedType: cur.linked_lead_id ? "lead" : "none",
-        relatedId: cur.linked_lead_id,
-      });
-      await patchCampaign(supabase, workspaceId, cur.id, { auto_task_shoot_id: task.id });
-      cur = (await refreshCampaign(supabase, workspaceId, cur.id)) ?? cur;
-    }
-  }
-
-  const postDay = cur.post_date_end || cur.post_date;
-  if (postDay && !cur.auto_task_post_id) {
-    const due = dateWithLocalMorning(postDay, 17);
-    if (due) {
-      const { task } = await createTask({
-        title: `Post deadline: ${cur.title.slice(0, 60)}`,
-        description: `Publish deliverables (see campaign brief).\n\n${campaignRefBlock(cur)}`,
-        dueAt: due,
-        relatedType: cur.linked_lead_id ? "lead" : "none",
-        relatedId: cur.linked_lead_id,
-      });
-      await patchCampaign(supabase, workspaceId, cur.id, { auto_task_post_id: task.id });
-    }
-  }
-}
-
-async function handleCompleted(supabase: SB, workspaceId: string, c: Campaign, actorId: string) {
-  let cur = (await refreshCampaign(supabase, workspaceId, c.id)) ?? c;
-
-  if (!cur.linked_lead_id) {
-    cur = await ensureCampaignBrandAndLead(supabase, workspaceId, cur);
-    cur = (await refreshCampaign(supabase, workspaceId, cur.id)) ?? cur;
-  }
-
-  cur = await ensureCampaignDeal(supabase, workspaceId, cur, actorId);
-  cur = (await refreshCampaign(supabase, workspaceId, cur.id)) ?? cur;
-
-  if (cur.linked_deal_id) {
-    const { error: dealErr } = await supabase
-      .from("deals")
-      .update({ stage: "won" })
-      .eq("id", cur.linked_deal_id)
-      .eq("workspace_id", workspaceId);
-    if (!dealErr) {
-      await recordWorkspaceActivity(supabase, {
-        workspaceId,
-        actorId,
-        eventType: "deal_stage_changed",
-        title: `Deal won: ${cur.title.slice(0, 80)}`,
-        summary: "Campaign marked done",
-        entityType: "deal",
-        entityId: cur.linked_deal_id,
-      });
-    }
-  }
-
-  if (cur.auto_task_completed_id) return;
-
-  const due = addDays(setHours(startOfDay(new Date()), 10), 5).toISOString();
-  const { task } = await createTask({
-    title: `Wrap up: ${cur.title.slice(0, 70)}`,
-    description: `Confirm payment / deliverables closed and archive references.\n\n${campaignRefBlock(cur)}`,
-    dueAt: due,
-    relatedType: cur.linked_lead_id ? "lead" : "none",
-    relatedId: cur.linked_lead_id,
-  });
-  await patchCampaign(supabase, workspaceId, cur.id, { auto_task_completed_id: task.id });
-}
-
 /**
- * Run side-effects when campaign status changes (idempotent per stored task ids).
+ * After creating a campaign row: create linked brand (if name), lead, and one deal.
+ * Idempotent if called again (uses linked_* / deal title).
  */
-export async function runCampaignStatusAutomation(
+export async function bootstrapCampaignPipeline(
   supabase: SB,
   workspaceId: string,
-  beforeStatus: CampaignStatus,
-  campaign: Campaign,
+  campaignId: string,
   actorId: string,
-) {
-  if (beforeStatus === campaign.status) return;
+): Promise<void> {
+  let cur = await refreshCampaign(supabase, workspaceId, campaignId);
+  if (!cur) return;
 
-  switch (campaign.status) {
-    case "applied":
-      await handleApplied(supabase, workspaceId, campaign, actorId);
-      break;
-    case "in_progress":
-      await handleInProgress(supabase, workspaceId, campaign, actorId);
-      break;
-    case "completed":
-      await handleCompleted(supabase, workspaceId, campaign, actorId);
-      break;
-    default:
-      break;
-  }
+  cur = await ensureCampaignBrandAndLead(supabase, workspaceId, cur);
+  cur = (await refreshCampaign(supabase, workspaceId, campaignId)) ?? cur;
+  await ensureCampaignDeal(supabase, workspaceId, cur, actorId);
+  await syncCampaignDerivedRecords(supabase, workspaceId, campaignId, actorId);
+}
+
+/** Kept for backward compatibility; campaign pipeline no longer reacts to column moves. */
+export async function runCampaignStatusAutomation(
+  _supabase: SB,
+  _workspaceId: string,
+  _beforeStatus: Campaign["status"],
+  _campaign: Campaign,
+  _actorId: string,
+) {
+  /* Manual-only: bootstrapping runs on createCampaign only. */
 }

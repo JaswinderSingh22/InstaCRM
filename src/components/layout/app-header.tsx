@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import type { WorkspaceUsageBadge } from "@/lib/billing/workspace-usage";
 import { LogOut, Menu, User } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,8 +21,28 @@ type Props = {
   email: string;
   name: string;
   avatarUrl: string | null;
+  usage: WorkspaceUsageBadge | null;
   onOpenMobileNav?: () => void;
 };
+
+function UsageChips({ usage }: { usage: WorkspaceUsageBadge }) {
+  const leadDenom =
+    usage.leadsCap >= 100_000 ? "∞" : usage.leadsCap.toLocaleString();
+  const aiDenom = usage.aiLimit == null ? "∞" : usage.aiLimit.toLocaleString();
+  return (
+    <div
+      className="flex max-w-[min(100%,14rem)] flex-wrap items-center justify-end gap-1 sm:max-w-none sm:gap-1.5"
+      aria-label="Workspace usage"
+    >
+      <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-neutral-800 sm:text-[11px]">
+        Leads {usage.leadsUsed}/{leadDenom}
+      </span>
+      <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold tabular-nums text-indigo-950 sm:text-[11px]">
+        AI {usage.aiUsed}/{aiDenom}
+      </span>
+    </div>
+  );
+}
 
 function initials(n: string) {
   if (!n.trim()) return "?";
@@ -30,7 +51,7 @@ function initials(n: string) {
   return (p[0]![0]! + p[1]![0]!).toUpperCase();
 }
 
-export function AppHeader({ email, name, avatarUrl, onOpenMobileNav }: Props) {
+export function AppHeader({ email, name, avatarUrl, usage, onOpenMobileNav }: Props) {
   const router = useRouter();
 
   return (
@@ -46,7 +67,8 @@ export function AppHeader({ email, name, avatarUrl, onOpenMobileNav }: Props) {
         </button>
       ) : null}
       <div className="min-w-0 flex-1" aria-hidden />
-      <div className="flex shrink-0 items-center">
+      <div className="flex shrink-0 items-center gap-2 md:gap-3">
+        {usage ? <UsageChips usage={usage} /> : null}
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
@@ -65,7 +87,7 @@ export function AppHeader({ email, name, avatarUrl, onOpenMobileNav }: Props) {
                 {name || email.split("@")[0]}
               </p>
               <p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#4F46E5]">
-                Pro creator
+                {usage?.tierLabel ?? "Starter"}
               </p>
             </div>
           </DropdownMenuTrigger>

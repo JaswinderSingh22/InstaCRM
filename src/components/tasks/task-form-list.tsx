@@ -4,69 +4,104 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { createTask, deleteTask, updateTask } from "@/app/actions/crm";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import type { Task } from "@/types/database";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatDistanceToNow } from "date-fns";
+import { Loader2 } from "lucide-react";
 
 export function TaskForm() {
   const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-  if (!open) {
-    return (
+
+  return (
+    <>
       <Button id="task-manager-add" size="sm" onClick={() => setOpen(true)}>
         Add task
       </Button>
-    );
-  }
-  return (
-    <form
-      className="mb-4 max-w-md space-y-2 rounded-md border border-border/60 bg-card/30 p-3"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.currentTarget);
-        const due = fd.get("due");
-        const rem = fd.get("remind");
-        try {
-          await createTask({
-            title: String(fd.get("title")),
-            dueAt: due ? new Date(String(due)).toISOString() : null,
-            reminderAt: rem ? new Date(String(rem)).toISOString() : null,
-            relatedType: "none",
-          });
-          setOpen(false);
-          toast.success("Task added");
-          router.refresh();
-        } catch (err) {
-          toast.error(err instanceof Error ? err.message : "Error");
-        }
-      }}
-    >
-      <div className="space-y-1.5">
-        <Label htmlFor="t">Title *</Label>
-        <Input id="t" name="title" required />
-      </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <div>
-          <Label htmlFor="d">Due</Label>
-          <Input id="d" name="due" type="datetime-local" />
-        </div>
-        <div>
-          <Label htmlFor="r">Remind at</Label>
-          <Input id="r" name="remind" type="datetime-local" />
-        </div>
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm">
-          Save
-        </Button>
-        <Button type="button" size="sm" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-    </form>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-w-md border-neutral-200 bg-white" showCloseButton>
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-neutral-900">Add task</DialogTitle>
+            <DialogDescription>Schedule a follow-up. Shown on your calendar and task list.</DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const fd = new FormData(e.currentTarget);
+              const due = fd.get("due");
+              const rem = fd.get("remind");
+              setLoading(true);
+              try {
+                await createTask({
+                  title: String(fd.get("title")),
+                  dueAt: due ? new Date(String(due)).toISOString() : null,
+                  reminderAt: rem ? new Date(String(rem)).toISOString() : null,
+                  relatedType: "none",
+                });
+                setOpen(false);
+                toast.success("Task added");
+                router.refresh();
+              } catch (err) {
+                toast.error(err instanceof Error ? err.message : "Error");
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="task-title">Title *</Label>
+              <Input
+                id="task-title"
+                name="title"
+                required
+                className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="task-due">Due</Label>
+                <Input
+                  id="task-due"
+                  name="due"
+                  type="datetime-local"
+                  className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="task-remind">Remind at</Label>
+                <Input
+                  id="task-remind"
+                  name="remind"
+                  type="datetime-local"
+                  className="h-10 rounded-lg border-neutral-200 bg-[#F8F9FC]"
+                />
+              </div>
+            </div>
+            <DialogFooter className="gap-2 sm:justify-end">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading} className="font-semibold">
+                {loading ? <Loader2 className="size-4 animate-spin" /> : "Save"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

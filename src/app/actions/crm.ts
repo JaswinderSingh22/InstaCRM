@@ -1,6 +1,7 @@
 "use server";
 
 import { recordWorkspaceActivity } from "@/lib/activity/record-workspace-event";
+import { leadCapForTier, normalizeTier } from "@/lib/billing/entitlements";
 import { getWorkspaceContextOrThrow } from "@/lib/crm/server-workspace";
 import { normalizeWorkspaceCurrency } from "@/lib/currency";
 import { fetchWorkspaceDefaultCurrency } from "@/lib/workspace-currency";
@@ -19,6 +20,45 @@ import type {
 async function getWorkspace() {
   const c = await getWorkspaceContextOrThrow();
   return { supabase: c.supabase, workspaceId: c.workspaceId, userId: c.userId };
+}
+
+async function assertActiveLeadCapacityOrThrow(
+  supabase: Awaited<ReturnType<typeof getWorkspace>>["supabase"],
+  workspaceId: string,
+) {
+  const { data: ws, error: wsErr } = await supabase
+    .from("workspaces")
+    .select("plan, subscription_status")
+    .eq("id", workspaceId)
+    .maybeSingle();
+  if (wsErr) throw wsErr;
+
+  const plan = typeof (ws as { plan?: unknown } | null)?.plan === "string"
+    ? ((ws as { plan: string }).plan as string)
+    : null;
+  const sub =
+    typeof (ws as { subscription_status?: unknown } | null)?.subscription_status === "string"
+      ? ((ws as { subscription_status: string }).subscription_status as string)
+      : "";
+
+  const tier = normalizeTier(plan, sub);
+  const cap = leadCapForTier(tier);
+
+  const { count, error } = await supabase
+    .from("leads")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .is("archived_at", null);
+
+  if (error) throw error;
+
+  if ((count ?? 0) >= cap) {
+    throw new Error(
+      tier === "free"
+        ? `Free plan includes up to ${cap} active leads. Archive leads you no longer need or upgrade to Pro.`
+        : `Your plan supports up to ${cap.toLocaleString()} active leads. Archive old leads or contact support for Agency limits.`,
+    );
+  }
 }
 
 function rev() {
@@ -55,6 +95,7 @@ export async function createLead(input: {
   notes?: string | null;
 }) {
   const { supabase, workspaceId, userId } = await getWorkspace();
+  await assertActiveLeadCapacityOrThrow(supabase, workspaceId);
   const { data, error } = await supabase
     .from("leads")
     .insert({
@@ -90,6 +131,7 @@ export async function createLeadReturningId(input: {
   notes?: string | null;
 }): Promise<string> {
   const { supabase, workspaceId, userId } = await getWorkspace();
+  await assertActiveLeadCapacityOrThrow(supabase, workspaceId);
   const { data, error } = await supabase
     .from("leads")
     .insert({
@@ -589,6 +631,7 @@ export async function createPayment(input: {
   status?: PaymentStatus;
   dueDate?: string | null;
   dealId?: string | null;
+  campaignId?: string | null;
   description?: string | null;
   currency?: string;
 }) {
@@ -606,6 +649,7 @@ export async function createPayment(input: {
       status: input.status ?? "pending",
       due_date: input.dueDate ?? null,
       deal_id: input.dealId ?? null,
+      campaign_id: input.campaignId ?? null,
       description: input.description ?? null,
     })
     .select("id")
@@ -630,6 +674,7 @@ export async function updatePayment(
     status: PaymentStatus;
     due_date: string | null;
     paid_at: string | null;
+    description: string | null;
   }>,
 ) {
   const { supabase, workspaceId, userId } = await getWorkspace();
@@ -639,6 +684,10 @@ export async function updatePayment(
     .eq("id", id)
     .eq("workspace_id", workspaceId)
     .maybeSingle();
+  if (!before) throw new Error("Payment not found");
+  if ((before as { status: PaymentStatus }).status === "paid") {
+    throw new Error("Paid invoices cannot be edited.");
+  }
   const { error } = await supabase.from("payments").update(patch).eq("id", id).eq("workspace_id", workspaceId);
   if (error) throw error;
   if (

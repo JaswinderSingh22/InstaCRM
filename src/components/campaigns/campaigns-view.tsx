@@ -15,10 +15,17 @@ type Props = {
 export function CampaignsView({ initial, workspaceDefaultCurrency }: Props) {
   const [addOpen, setAddOpen] = useState(false);
   const [addStatus, setAddStatus] = useState<CampaignStatus>("inbox");
+  const [editCampaign, setEditCampaign] = useState<Campaign | null>(null);
 
   const openAdd = (status: CampaignStatus) => {
+    setEditCampaign(null);
     setAddStatus(status);
     setAddOpen(true);
+  };
+
+  const handleModalOpenChange = (open: boolean) => {
+    setAddOpen(open);
+    if (!open) setEditCampaign(null);
   };
 
   return (
@@ -27,11 +34,11 @@ export function CampaignsView({ initial, workspaceDefaultCurrency }: Props) {
         <div className="min-w-0">
           <h1 className="text-xl font-bold tracking-tight text-neutral-900 sm:text-2xl">Campaigns</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Capture briefs from WhatsApp, track apply → post → paid in one board. Drag cards to update your stage.
-            Moving to <strong className="font-medium text-neutral-700">Applied</strong>,{" "}
-            <strong className="font-medium text-neutral-700">In progress</strong>, or{" "}
-            <strong className="font-medium text-neutral-700">Done</strong> auto-creates Creators/Brands rows and
-            calendar tasks when needed.
+            Capture briefs and track stages on the board. Moving a column only updates this campaign&apos;s stage—brand,
+            lead, deal, and payment rows don&apos;t change unless you edit them yourself.{" "}
+            <span className="font-medium text-neutral-700">Done</span> means deliverables wrapped;{" "}
+            <span className="font-medium text-neutral-700">Passed</span> means you didn&apos;t get or declined the gig.
+            Subscription charges appear under Billing (Stripe); creator payouts and invoices you record live under Payments.
           </p>
         </div>
         <Button
@@ -44,12 +51,21 @@ export function CampaignsView({ initial, workspaceDefaultCurrency }: Props) {
         </Button>
       </div>
 
-      <CampaignsKanban initial={initial} onAddCampaign={openAdd} />
+      <CampaignsKanban
+        initial={initial}
+        onAddCampaign={openAdd}
+        onEditCampaign={(c) => {
+          setEditCampaign(c);
+          setAddStatus(c.status);
+          setAddOpen(true);
+        }}
+      />
       <AddCampaignModal
         open={addOpen}
-        onOpenChange={setAddOpen}
+        onOpenChange={handleModalOpenChange}
         defaultStatus={addStatus}
         defaultCurrency={workspaceDefaultCurrency}
+        initialCampaign={editCampaign}
       />
     </div>
   );

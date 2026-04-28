@@ -39,7 +39,7 @@ export function DashboardMetricRow({
     {
       label: "Revenue (MTD)",
       value: formatMoney(revenueMtdCents, workspaceDefaultCurrency),
-      sub: revenueMtdCents > 0 ? "Paid invoices" : "—",
+      sub: revenueMtdCents > 0 ? "Paid in Payments tab" : "Requires paid invoices",
       subClass: "text-emerald-600",
       icon: DollarSign,
     },

@@ -1,11 +1,19 @@
 "use server";
 
 import { recordWorkspaceActivity } from "@/lib/activity/record-workspace-event";
+import {
+  aiBriefParseLimitForTier,
+  currentUtcMonthKey,
+  normalizeTier,
+} from "@/lib/billing/entitlements";
 import { revalidatePath } from "next/cache";
 import { getWorkspaceContextOrThrow } from "@/lib/crm/server-workspace";
-import { parseCampaignBriefWithOpenAI } from "@/lib/openai/parse-campaign-brief";
-import { runCampaignStatusAutomation } from "@/lib/campaigns/automation";
 import { normalizeWorkspaceCurrency } from "@/lib/currency";
+import {
+  enrichParsedBriefWithHeuristics,
+  parseCampaignBriefWithOpenAI,
+} from "@/lib/openai/parse-campaign-brief";
+import { bootstrapCampaignPipeline, syncCampaignDerivedRecords } from "@/lib/campaigns/automation";
 import { fetchWorkspaceDefaultCurrency } from "@/lib/workspace-currency";
 import type { Campaign, CampaignCompensationType, CampaignStatus } from "@/types/database";
 
@@ -26,7 +34,53 @@ function rev() {
 }
 
 export async function parseBriefWithAi(rawText: string) {
-  return parseCampaignBriefWithOpenAI(rawText);
+  const { supabase, workspaceId } = await workspace();
+
+  const { data: wsRow, error: wsErr } = await supabase
+    .from("workspaces")
+    .select("plan, subscription_status, ai_brief_parses_count, ai_brief_parses_period, default_currency")
+    .eq("id", workspaceId)
+    .single();
+
+  if (wsErr) throw wsErr;
+
+  const row = wsRow as {
+    plan: string | null;
+    subscription_status: string | null;
+    ai_brief_parses_count?: number | null;
+    ai_brief_parses_period?: string | null;
+    default_currency?: string | null;
+  };
+
+  const tier = normalizeTier(row.plan, row.subscription_status ?? "");
+  const limit = aiBriefParseLimitForTier(tier);
+  const month = currentUtcMonthKey();
+  const used = row.ai_brief_parses_period === month ? Number(row.ai_brief_parses_count ?? 0) : 0;
+
+  if (limit != null && used >= limit) {
+    const msg =
+      tier === "free"
+        ? "Free plan includes 2 AI campaign brief extractions per month (UTC). Upgrade to Pro for 120/month."
+        : "You have reached this month's AI brief extraction limit on your plan.";
+    throw new Error(msg);
+  }
+
+  const defaultCurrency = normalizeWorkspaceCurrency(row.default_currency ?? "INR");
+  const aiParsed = await parseCampaignBriefWithOpenAI(rawText);
+  const parsed = enrichParsedBriefWithHeuristics(rawText, aiParsed, defaultCurrency);
+
+  const { error: upErr } = await supabase
+    .from("workspaces")
+    .update({
+      ai_brief_parses_count: used + 1,
+      ai_brief_parses_period: month,
+    })
+    .eq("id", workspaceId);
+
+  if (upErr) throw upErr;
+
+  revalidatePath("/billing");
+  return parsed;
 }
 
 export async function createCampaign(input: {
@@ -88,14 +142,16 @@ export async function createCampaign(input: {
     .single();
 
   if (error) throw error;
+  const campaignId = (created as { id: string }).id;
   await recordWorkspaceActivity(supabase, {
     workspaceId,
     actorId: userId,
     eventType: "campaign_created",
     title: `Campaign: ${input.title.trim()}`,
     entityType: "campaign",
-    entityId: (created as { id: string }).id,
+    entityId: campaignId,
   });
+  await bootstrapCampaignPipeline(supabase, workspaceId, campaignId, userId);
   rev();
 }
 
@@ -149,16 +205,25 @@ export async function updateCampaign(
       entityType: "campaign",
       entityId: id,
     });
-    const { data: afterRow } = await supabase
-      .from("campaigns")
-      .select("*")
-      .eq("id", id)
-      .eq("workspace_id", workspaceId)
-      .maybeSingle();
-    if (afterRow) {
-      await runCampaignStatusAutomation(supabase, workspaceId, previousStatus, afterRow as Campaign, userId);
-    }
   }
+
+  const derivedKeys = [
+    "shoot_date",
+    "post_date",
+    "post_date_end",
+    "brand_name",
+    "title",
+    "compensation_cents",
+    "compensation_summary",
+    "compensation_type",
+    "currency",
+    "agency_name",
+  ];
+  const shouldSyncDerived = Object.keys(patch).some((k) => derivedKeys.includes(k));
+  if (shouldSyncDerived) {
+    await syncCampaignDerivedRecords(supabase, workspaceId, id, userId);
+  }
+
   rev();
 }
 
@@ -185,12 +250,25 @@ export async function deleteCampaign(id: string) {
 
   const c = row as Campaign;
 
-  const taskIds = [
+  const autoTaskIds = [
     c.auto_task_applied_id,
     c.auto_task_shoot_id,
     c.auto_task_post_id,
     c.auto_task_completed_id,
   ].filter((x): x is string => typeof x === "string" && x.length > 0);
+
+  let dealLinkedTaskIds: string[] = [];
+  if (c.linked_deal_id) {
+    const { data: dealTasks } = await supabase
+      .from("tasks")
+      .select("id")
+      .eq("workspace_id", workspaceId)
+      .eq("related_type", "deal")
+      .eq("related_id", c.linked_deal_id);
+    dealLinkedTaskIds = ((dealTasks ?? []) as { id: string }[]).map((t) => t.id);
+  }
+
+  const taskIds = [...new Set([...autoTaskIds, ...dealLinkedTaskIds])];
 
   if (taskIds.length > 0) {
     const { error: taskErr } = await supabase
@@ -201,13 +279,23 @@ export async function deleteCampaign(id: string) {
     if (taskErr) throw taskErr;
   }
 
+  const { error: payCampErr } = await supabase
+    .from("payments")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("campaign_id", id);
+  if (payCampErr) throw payCampErr;
+
   if (c.linked_deal_id) {
-    const { error: payErr } = await supabase
+    const { error: payDealErr } = await supabase
       .from("payments")
       .delete()
-      .eq("deal_id", c.linked_deal_id)
-      .eq("workspace_id", workspaceId);
-    if (payErr) throw payErr;
+      .eq("workspace_id", workspaceId)
+      .eq("deal_id", c.linked_deal_id);
+    if (payDealErr) throw payDealErr;
+  }
+
+  if (c.linked_deal_id) {
     const { error: dealErr } = await supabase
       .from("deals")
       .delete()

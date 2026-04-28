@@ -139,6 +139,8 @@ export type Payment = {
   id: string;
   workspace_id: string;
   deal_id: string | null;
+  /** Set when invoice is generated from a creator campaign (cascade on campaign delete). */
+  campaign_id: string | null;
   client_name: string;
   amount_cents: number;
   currency: string;
